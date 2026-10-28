@@ -225,9 +225,9 @@ private:
     ID3D11ShaderResourceView* m_MacroIcon = nullptr;
 
     // Cool glass surfaces and a configurable luminous accent.
-    ImVec4 m_AccentColor = ImVec4(0.24f, 0.84f, 0.88f, 1.0f);
+    ImVec4 m_AccentColor = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
     // Base colour of the dark cards behind the features (alpha comes from kCardOpacity).
-    ImVec4 m_CardColor = ImVec4(0.055f, 0.075f, 0.095f, 1.0f);
+    ImVec4 m_CardColor = ImVec4(0.055f, 0.065f, 0.13f, 1.0f);
     float m_GlowIntensity = 0.45f;
     float m_WindowGlowIntensity = 0.45f;
     float m_AppearAnim = 0.0f;
@@ -276,12 +276,12 @@ private:
     float m_PreviewHorizAnim = 180.0f;
     float m_PreviewVertAnim = 100.0f;
 
-    ImVec4 m_WindowColor = ImVec4(0.035f, 0.055f, 0.075f, 1.0f);
-    ImVec4 m_BackgroundColor = ImVec4(0.055f, 0.075f, 0.095f, 1.0f);
-    ImVec4 m_FrameColor = ImVec4(0.085f, 0.115f, 0.145f, 1.0f);
-    ImVec4 m_ButtonColor = ImVec4(0.11f, 0.15f, 0.18f, 1.0f);
-    ImVec4 m_ButtonHoveredColor = ImVec4(0.16f, 0.24f, 0.27f, 1.0f);
-    ImVec4 m_ButtonActiveColor = ImVec4(0.24f, 0.84f, 0.88f, 1.0f);
-    ImVec4 m_ItemColor = ImVec4(0.24f, 0.84f, 0.88f, 1.0f);
-    ImVec4 m_ItemActiveColor = ImVec4(0.40f, 0.93f, 0.96f, 1.0f);
+    ImVec4 m_WindowColor = ImVec4(0.025f, 0.027f, 0.07f, 1.0f);
+    ImVec4 m_BackgroundColor = ImVec4(0.04f, 0.045f, 0.11f, 1.0f);
+    ImVec4 m_FrameColor = ImVec4(0.075f, 0.075f, 0.17f, 1.0f);
+    ImVec4 m_ButtonColor = ImVec4(0.10f, 0.085f, 0.22f, 1.0f);
+    ImVec4 m_ButtonHoveredColor = ImVec4(0.18f, 0.13f, 0.36f, 1.0f);
+    ImVec4 m_ButtonActiveColor = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
+    ImVec4 m_ItemColor = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
+    ImVec4 m_ItemActiveColor = ImVec4(0.63f, 0.57f, 1.0f, 1.0f);
 };
