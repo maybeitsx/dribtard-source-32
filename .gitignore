@@ -1,0 +1,12 @@
+# Release signing private key (NEVER commit or upload to Cloudflare)
+release-tools/release_private.pem
+*.pem
+
+# Build and runtime artifacts
+External Macro/build/
+license-server/node_modules/
+license-server/.wrangler/
+license-server/.dev.vars
+.env
+*.old.exe
+*.new.exe

@@ -1,0 +1,15 @@
+name = "dribtard-license-server"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Free tier: Workers + KV. Create the KV namespace first, then paste its id here:
+#   npx wrangler kv:namespace create LICENSES
+# For local dev: npx wrangler kv:namespace create LICENSES --preview
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "3b6a73e5dd6140c4b7c5da6aa68f41da"
+
+# Secrets (never commit these; set with `wrangler secret put <NAME>`):
+#   DISCORD_PUBLIC_KEY   - Discord app public key (64 hex chars)
+#   SIGNING_PRIVATE_KEY  - Ed25519 PKCS#8 DER base64 from generate_keys.mjs
+#   ADMIN_IDS            - comma-separated Discord user IDs, e.g. "123,456"

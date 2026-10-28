@@ -1,0 +1,16 @@
+{
+  "name": "dribtard-license-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker license server for dribtard (free tier, no dependencies beyond wrangler).",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "genkeys": "node generate_keys.mjs",
+    "register-commands": "node register_commands.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
