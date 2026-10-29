@@ -26,8 +26,8 @@ namespace
 {
     // Full menu size. While the menu panel is closed the window shrinks to
     // just the icon rail (kRailWindowWidth).
-    constexpr ImVec2 kWindowSize(820.0f, 524.0f);
-    constexpr float kRailWindowWidth = 58.0f;
+    constexpr ImVec2 kWindowSize(900.0f, 580.0f);
+    constexpr float kRailWindowWidth = 68.0f;
     constexpr float kCompactWindowWidth = 490.0f;
     constexpr float kCompactGeneralWidth = 560.0f;
 
@@ -38,8 +38,8 @@ namespace
         The panel and cards are see-through so the game shows behind the menu,
         like the reference overlay. Raise the values for a more solid look.
     */
-    constexpr float kPanelOpacity = 0.40f;
-    constexpr float kCardOpacity = 0.72f;
+    constexpr float kPanelOpacity = 0.56f;
+    constexpr float kCardOpacity = 0.82f;
 
     // Shared metrics for the footer row and the unload pill.
     constexpr float kFooterPillHeight = 24.0f;
@@ -592,23 +592,23 @@ void ImGuiUI::ApplyTheme()
 
     style.Colors[ImGuiCol_WindowBg] = m_WindowColor;
     style.Colors[ImGuiCol_ChildBg] = m_BackgroundColor;
-    style.Colors[ImGuiCol_PopupBg] = ImVec4(0.055f, 0.075f, 0.095f, 0.98f);
+    style.Colors[ImGuiCol_PopupBg] = ImVec4(0.035f, 0.035f, 0.095f, 0.99f);
     style.Colors[ImGuiCol_FrameBg] = m_FrameColor;
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.14f, 0.20f, 0.24f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.16f, 0.25f, 0.29f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.14f, 0.11f, 0.28f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.20f, 0.15f, 0.38f, 1.0f);
     style.Colors[ImGuiCol_Button] = m_ButtonColor;
     style.Colors[ImGuiCol_ButtonHovered] = m_ButtonHoveredColor;
     style.Colors[ImGuiCol_ButtonActive] = accent;
-    style.Colors[ImGuiCol_Header] = ImVec4(accent.x, accent.y, accent.z, 0.45f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(accentBright.x, accentBright.y, accentBright.z, 0.65f);
+    style.Colors[ImGuiCol_Header] = ImVec4(accent.x, accent.y, accent.z, 0.34f);
+    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(accentBright.x, accentBright.y, accentBright.z, 0.58f);
     style.Colors[ImGuiCol_HeaderActive] = accentBright;
-    style.Colors[ImGuiCol_CheckMark] = accent;
+    style.Colors[ImGuiCol_CheckMark] = accentBright;
     style.Colors[ImGuiCol_SliderGrab] = accent;
     style.Colors[ImGuiCol_SliderGrabActive] = accentBright;
-    style.Colors[ImGuiCol_Border] = ImVec4(1.0f, 1.0f, 1.0f, 0.07f);
-    style.Colors[ImGuiCol_Separator] = ImVec4(1.0f, 1.0f, 1.0f, 0.06f);
-    style.Colors[ImGuiCol_Text] = ImVec4(0.90f, 0.94f, 0.96f, 1.0f);
-    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.56f, 0.64f, 0.69f, 1.0f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.63f, 0.57f, 1.0f, 0.14f);
+    style.Colors[ImGuiCol_Separator] = ImVec4(0.63f, 0.57f, 1.0f, 0.10f);
+    style.Colors[ImGuiCol_Text] = ImVec4(0.94f, 0.94f, 1.0f, 1.0f);
+    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.58f, 0.60f, 0.76f, 1.0f);
 }
 
 void ImGuiUI::UpdateAnimations()
@@ -661,8 +661,8 @@ void ImGuiUI::DrawWindowGlow(ImVec2 min, ImVec2 max, float appear)
 
 void ImGuiUI::RestoreAppearanceDefaults()
 {
-    m_AccentColor = ImVec4(0.24f, 0.84f, 0.88f, 1.0f);
-    m_CardColor = ImVec4(0.055f, 0.075f, 0.095f, 1.0f);
+    m_AccentColor = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
+    m_CardColor = ImVec4(0.055f, 0.065f, 0.13f, 1.0f);
     m_GlowIntensity = 0.45f;
     m_WindowGlowIntensity = 0.45f;
     m_PanelOpacity = kPanelOpacity;
