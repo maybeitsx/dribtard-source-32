@@ -39,6 +39,7 @@ namespace
 
         AppConfig lastSaved{};
         std::chrono::steady_clock::time_point lastSave{};
+        std::chrono::steady_clock::time_point lastTapAttempt{};
         bool moonwalkBlocked = false;
         bool started = false;
         bool quit = false;
@@ -85,13 +86,7 @@ namespace
 
         void HandleKey(int keyCode)
         {
-            // While the menu is rebinding, the next key goes to the setting.
-            if (menu.IsCapturingKey())
-            {
-                menu.CaptureKey(keyCode, config);
-                return;
-            }
-
+            // Emergency stop works even while a key is being rebound.
             if (keyCode == Keys::F12)
             {
                 structure.EmergencyStop();
@@ -101,6 +96,15 @@ namespace
                 return;
             }
 
+            // While the menu is rebinding, the next key goes to the setting.
+            if (menu.IsCapturingKey())
+            {
+                menu.CaptureKey(keyCode, config);
+                return;
+            }
+
+            // The menu key is checked before every other shortcut, so a key
+            // bound to it always toggles the panel.
             if (keyCode == config.ui.menuKey)
             {
                 menu.SetVisible(!menu.Visible());
@@ -164,6 +168,25 @@ namespace
             if (!started)
                 return;
 
+            /*
+                The tap cannot be created before Accessibility permission is
+                granted, and macOS normally grants it after the app has already
+                launched. Retrying here is what makes the menu key (and every
+                rebind) start working the moment the user allows it, instead of
+                staying dead until the next launch.
+            */
+            if (!hotkeys.Running())
+            {
+                const auto attemptNow = std::chrono::steady_clock::now();
+
+                if (lastTapAttempt.time_since_epoch().count() == 0 ||
+                    attemptNow - lastTapAttempt > std::chrono::seconds(2))
+                {
+                    lastTapAttempt = attemptNow;
+                    hotkeys.Start();
+                }
+            }
+
             for (const int key : hotkeys.PollPressed())
                 HandleKey(key);
 
@@ -179,11 +202,18 @@ namespace
             menu.SetStatus(status);
 
             // Moonwalk is a hold loop: it runs while its key is down, never
-            // alongside another engine, and only with the game focused.
+            // alongside another engine, and only with the game focused. The
+            // tap's own key state is used when it is running: it sees keys
+            // aimed at the game, where CGEventSourceKeyState can report the
+            // key as up.
+            const bool holdKeyDown = hotkeys.Running()
+                ? hotkeys.IsKeyDown(config.moonwalk.holdKey)
+                : MacInput::IsKeyDown(config.moonwalk.holdKey);
+
             const bool held = !menu.IsCapturingKey() &&
                 !config.bladeBall.armed &&
                 focused &&
-                MacInput::IsKeyDown(config.moonwalk.holdKey);
+                holdKeyDown;
 
             if (!held)
                 moonwalkBlocked = false;

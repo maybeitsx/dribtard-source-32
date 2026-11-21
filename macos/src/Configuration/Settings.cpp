@@ -298,6 +298,12 @@ bool Settings::Load(AppConfig& config)
     if (ReadBool(json, "bbRestoreCamera", b)) bb.restoreCamera = b;
     if (ReadInt(json, "bbJitterMs", v)) bb.jitterMs = ClampInt(v, 0, 50);
 
+    // An old or hand-edited file can bind the trigger to the key the macro
+    // presses. The game would then get two F presses for one parry, which looks
+    // exactly like a double click.
+    if (bb.triggerKey == bb.parryKey)
+        bb.triggerKey = (bb.parryKey == Keys::V) ? Keys::C : Keys::V;
+
     UiSettings& ui = parsed.ui;
     if (ReadInt(json, "menuKey", v)) ui.menuKey = ClampInt(v, 0, 255);
     if (ReadDouble(json, "accentR", d)) ui.accentR = static_cast<float>(ClampDouble(d, 0.0, 1.0));

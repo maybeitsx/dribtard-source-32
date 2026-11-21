@@ -305,7 +305,7 @@ void Menu::DrawBladeBallPage(AppConfig& config)
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
 
-    BeginCard("##card_bb_curve", width, 190.0f);
+    BeginCard("##card_bb_curve", width, 216.0f);
     {
         CardHeader("Curve Parry");
 
@@ -317,6 +317,12 @@ void Menu::DrawBladeBallPage(AppConfig& config)
         ImGui::InputDouble("Flick duration (sec)", &config.bladeBall.flickDurationSeconds, 0.01, 0.05, "%.3f");
         config.bladeBall.flickDurationSeconds =
             std::clamp(config.bladeBall.flickDurationSeconds, 0.0, 10.0);
+
+        // The curve parry has its own sensitivity, independent of the General
+        // page: the flick is scaled by 1 / this value when it runs.
+        ImGui::SetNextItemWidth(width - 210.0f);
+        ImGui::InputDouble("Roblox sensitivity", &config.bladeBall.robloxSensitivity, 0.05, 0.25, "%.3f");
+        ClampSensitivity(config.bladeBall.robloxSensitivity);
 
         ImGui::SetNextItemWidth(width - 210.0f);
         ImGui::SliderInt("Timing jitter", &config.bladeBall.jitterMs, 0, 25, "+/- %d ms");

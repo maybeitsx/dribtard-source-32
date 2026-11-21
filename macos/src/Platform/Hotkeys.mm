@@ -4,6 +4,8 @@
 
 #include <chrono>
 
+#include <unistd.h>
+
 namespace
 {
     CGEventRef TapCallback(
@@ -20,22 +22,38 @@ namespace
 
         if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput)
         {
-            // The system disables a slow tap; ask for it back instead of
-            // silently losing every hotkey.
+            // The system disables a slow tap; ask it back instead of silently
+            // losing every hotkey.
             monitor->PushTapDisabled();
             return event;
         }
+
+        /*
+            Ignore events this app posted itself. The macro injects its keys at
+            kCGHIDEventTap, which this session tap sees, so without this filter
+            a parry arrives a second time as a fresh key press and can fire the
+            macro again: that is the double F a curve parry showed.
+        */
+        const pid_t sourcePid = static_cast<pid_t>(
+            CGEventGetIntegerValueField(event, kCGEventSourceUnixProcessID));
+        if (sourcePid == getpid())
+            return event;
 
         if (type == kCGEventKeyDown)
         {
             const int keyCode = static_cast<int>(
                 CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
-            const int repeat = static_cast<int>(
-                CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat));
 
-            // Auto-repeat must not retrigger the macro while a key is held.
-            if (repeat == 0)
-                monitor->PushKey(keyCode);
+            // PushKey() queues only the transition, so the auto-repeat that a
+            // held key sends does not retrigger the macro.
+            monitor->PushKey(keyCode);
+        }
+        else if (type == kCGEventKeyUp)
+        {
+            const int keyCode = static_cast<int>(
+                CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
+
+            monitor->PushKeyUp(keyCode);
         }
 
         return event;
@@ -49,8 +67,27 @@ HotkeyMonitor::~HotkeyMonitor()
 
 void HotkeyMonitor::PushKey(int keyCode)
 {
+    if (keyCode < 0 || keyCode > 255)
+        return;
+
     std::lock_guard<std::mutex> lock(m_Mutex);
-    m_Pending.push_back(keyCode);
+
+    const bool wasDown = m_Down[keyCode];
+    m_Down[keyCode] = true;
+
+    // The tap's auto-repeat repeats the down event; only the transition is a
+    // press, exactly like a physical key going down once.
+    if (!wasDown)
+        m_Pending.push_back(keyCode);
+}
+
+void HotkeyMonitor::PushKeyUp(int keyCode)
+{
+    if (keyCode < 0 || keyCode > 255)
+        return;
+
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    m_Down[keyCode] = false;
 }
 
 void HotkeyMonitor::PushTapDisabled()
@@ -67,12 +104,33 @@ std::vector<int> HotkeyMonitor::PollPressed()
     return pressed;
 }
 
+bool HotkeyMonitor::IsKeyDown(int keyCode) const
+{
+    if (keyCode < 0 || keyCode > 255)
+        return false;
+
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    return m_Down[keyCode];
+}
+
 bool HotkeyMonitor::Start()
 {
     if (m_Running.load())
         return true;
 
-    const CGEventMask mask = CGEventMaskBit(kCGEventKeyDown);
+    /*
+        A previous attempt can leave a thread behind when the tap never
+        reported in (the usual case before Accessibility is granted). Retire
+        it before replacing the member, or assigning to a joinable
+        std::thread ends the process.
+    */
+    Stop();
+
+    // Key-up is needed as much as key-down: it ends an auto-repeat and
+    // releases the hold-triggered Moonwalk.
+    const CGEventMask mask =
+        CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+
     CFMachPortRef tap = CGEventTapCreate(
         kCGSessionEventTap,
         kCGHeadInsertEventTap,
@@ -113,7 +171,12 @@ bool HotkeyMonitor::Start()
     for (int i = 0; i < 500 && !m_Running.load(); ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    return m_Running.load();
+    const bool running = m_Running.load();
+
+    if (!running)
+        Stop();
+
+    return running;
 }
 
 void HotkeyMonitor::Stop()
@@ -134,4 +197,8 @@ void HotkeyMonitor::Stop()
         CFRelease(static_cast<CFMachPortRef>(m_Tap));
         m_Tap = nullptr;
     }
+
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    m_Pending.clear();
+    m_Down.fill(false);
 }

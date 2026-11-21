@@ -1,0 +1,51 @@
+dribtard for macOS
+==================
+
+The short version
+-----------------
+
+1. Drag "dribtard-mac.app" into your Applications folder.
+2. Double-click "Fix and open.command" (the file next to this one).
+   A Terminal window opens, fixes the app and launches it.
+3. After that, double-click "dribtard-mac.app" as normal.
+
+macOS refuses apps that were downloaded and are not notarised by Apple. The
+helper does exactly what Apple's own "Open Anyway" does, in one step: it removes
+the quarantine flag, signs the app on your Mac, and opens it. It is safe to run
+again at any time.
+
+
+If you prefer to paste a command
+--------------------------------
+
+Open Terminal (Applications -> Utilities -> Terminal) and paste this one line,
+then press Return:
+
+  APP=$(ls -d ~/Downloads/dribtard-mac.app /Applications/dribtard-mac.app 2>/dev/null | head -1); xattr -dr com.apple.quarantine "$APP"; codesign --force --deep --sign - "$APP"; open "$APP"
+
+
+Doing it without Terminal at all
+--------------------------------
+
+- Right-click (Control-click) the app and choose "Open".
+- Or open System Settings -> Privacy & Security, scroll to Security, and click
+  "Open Anyway" next to the message about dribtard-mac.
+
+On macOS 15 and later the right-click shortcut is often missing, so "Open
+Anyway", or the helper above, is the reliable path.
+
+Do not launch the "dribtard-mac" file inside
+dribtard-mac.app/Contents/MacOS by itself - always launch the .app.
+
+
+First run
+---------
+
+The app is an accessory app: it has no Dock icon, just a floating panel.
+
+macOS will ask for Accessibility permission (System Settings ->
+Privacy & Security -> Accessibility). Turn dribtard on there. If the global
+keys still do nothing, also turn it on under Input Monitoring.
+
+The panel should then appear. If it does not, press the menu key, which is
+the backslash key ( \ ) by default.

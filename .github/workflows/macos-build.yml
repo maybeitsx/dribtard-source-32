@@ -59,10 +59,18 @@ jobs:
 
       - name: Package
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            "macos/build/dribtard-mac.app" "dribtard-mac.zip"
+          # The zip ships the app, a guide and a double-clickable helper that
+          # clears Gatekeeper's quarantine and launches it, so the customer
+          # never has to type a command.
+          rm -rf pkg && mkdir pkg
+          ditto "macos/build/dribtard-mac.app" "pkg/dribtard-mac.app"
+          cp "macos/dist/dribtard-mac/READ-ME-FIRST.txt" "pkg/READ-ME-FIRST.txt"
+          cp "macos/dist/dribtard-mac/Fix and open.command" "pkg/Fix and open.command"
+          chmod +x "pkg/dribtard-mac.app/Contents/MacOS/dribtard-mac" "pkg/Fix and open.command"
+          ditto -c -k --sequesterRsrc pkg dribtard-mac.zip
+          unzip -Z -l dribtard-mac.zip
           shasum -a 256 "dribtard-mac.zip" | tee dribtard-mac.sha256
-          lipo -info "macos/build/dribtard-mac.app/Contents/MacOS/dribtard-mac"
+          lipo -info "pkg/dribtard-mac.app/Contents/MacOS/dribtard-mac"
 
       - name: Upload app
         uses: actions/upload-artifact@v4
