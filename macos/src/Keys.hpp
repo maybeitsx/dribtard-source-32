@@ -1,0 +1,93 @@
+#pragma once
+
+/*
+    macOS virtual key codes (Carbon kVK_* values). The Windows build stores
+    Windows virtual-key codes in its settings; this build stores these, so a
+    Windows config file and a macOS config file are not interchangeable.
+*/
+namespace Keys
+{
+enum : int
+{
+    A = 0x00,
+    S = 0x01,
+    D = 0x02,
+    F = 0x03,
+    H = 0x04,
+    G = 0x05,
+    Z = 0x06,
+    X = 0x07,
+    C = 0x08,
+    V = 0x09,
+    B = 0x0B,
+    Q = 0x0C,
+    W = 0x0D,
+    E = 0x0E,
+    R = 0x0F,
+    Y = 0x10,
+    T = 0x11,
+    One = 0x12,
+    Two = 0x13,
+    Three = 0x14,
+    Four = 0x15,
+    Six = 0x16,
+    Five = 0x17,
+    Equal = 0x18,
+    Nine = 0x19,
+    Seven = 0x1A,
+    Minus = 0x1B,
+    Eight = 0x1C,
+    Zero = 0x1D,
+    RightBracket = 0x1E,
+    O = 0x1F,
+    U = 0x20,
+    LeftBracket = 0x21,
+    I = 0x22,
+    P = 0x23,
+    Return = 0x24,
+    L = 0x25,
+    J = 0x26,
+    Quote = 0x27,
+    K = 0x28,
+    Semicolon = 0x29,
+    Backslash = 0x2A,
+    Comma = 0x2B,
+    Slash = 0x2C,
+    N = 0x2D,
+    M = 0x2E,
+    Period = 0x2F,
+    Tab = 0x30,
+    Space = 0x31,
+    Grave = 0x32,
+    Backspace = 0x33,
+    Escape = 0x35,
+    F1 = 0x7A,
+    F2 = 0x78,
+    F3 = 0x63,
+    F4 = 0x76,
+    F5 = 0x60,
+    F6 = 0x61,
+    F7 = 0x62,
+    F8 = 0x64,
+    F9 = 0x65,
+    F10 = 0x6D,
+    F11 = 0x67,
+    F12 = 0x6F,
+    Home = 0x73,
+    End = 0x77,
+    PageUp = 0x74,
+    PageDown = 0x79,
+    Delete = 0x75,
+    Left = 0x7B,
+    Right = 0x7C,
+    Down = 0x7D,
+    Up = 0x7E,
+    Keypad1 = 0x53,
+    Keypad2 = 0x54,
+    Keypad3 = 0x55,
+    Keypad4 = 0x56
+};
+
+// Short label for the menu, e.g. "C", "F12", "Space".
+const char* Name(int key);
+} // namespace Keys

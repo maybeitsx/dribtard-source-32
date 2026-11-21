@@ -1,0 +1,82 @@
+name: macOS build
+
+#
+# Builds the separate macOS version in macos/ on a GitHub-hosted macOS runner,
+# so no Mac is needed locally. The Windows build ("External Macro") is not
+# compiled here.
+#
+# The result is a universal (Apple silicon + Intel) dribtard-mac.app, zipped and
+# attached to the run as the "dribtard-mac" artifact.
+#
+# Download it with:
+#   gh run download --repo maybeitsx/dribtard-source --name dribtard-mac
+#
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "macos/**"
+      - ".github/workflows/macos-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          cmake --version
+          clang++ --version
+          sw_vers
+
+      - name: Configure
+        run: >
+          cmake -S macos -B macos/build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build macos/build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir macos/build -C Release --output-on-failure
+
+      # Ad-hoc signature: enough for the app to run locally once Gatekeeper's
+      # quarantine flag is cleared. A Developer ID signature + notarisation is
+      # what removes that step for the customer (see macos/README.md).
+      - name: Ad-hoc sign
+        run: |
+          codesign --force --deep --sign - "macos/build/dribtard-mac.app"
+          codesign --verify --deep --strict --verbose=2 "macos/build/dribtard-mac.app"
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "macos/build/dribtard-mac.app" "dribtard-mac.zip"
+          shasum -a 256 "dribtard-mac.zip" | tee dribtard-mac.sha256
+          lipo -info "macos/build/dribtard-mac.app/Contents/MacOS/dribtard-mac"
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: dribtard-mac
+          path: |
+            dribtard-mac.zip
+            dribtard-mac.sha256
+          if-no-files-found: error
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-logs
+          path: macos/build/CMakeFiles/CMakeOutput.log
+          if-no-files-found: ignore
