@@ -127,7 +127,7 @@ bool HotkeyMonitor::Start()
     Stop();
 
     // Key-up is needed as much as key-down: it ends an auto-repeat and
-    // releases the hold-triggered Moonwalk.
+    // releases the clicker when its hold key comes up.
     const CGEventMask mask =
         CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
 

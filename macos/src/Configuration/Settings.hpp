@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Macro/BladeBallMacro.hpp"
+#include "Macro/ClickerMacro.hpp"
 #include "Macro/MacroEngine.hpp"
-#include "Macro/MoonwalkMacro.hpp"
 
 #include <string>
 
@@ -23,7 +23,7 @@ struct UiSettings
 struct AppConfig
 {
     MacroSettings macro{};
-    MoonwalkSettings moonwalk{};
+    ClickerSettings clicker{};
     BladeBallSettings bladeBall{};
     UiSettings ui{};
 };

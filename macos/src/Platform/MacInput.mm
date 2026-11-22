@@ -71,6 +71,31 @@ bool MacInput::PostMouseMove(int dx, int dy)
     return true;
 }
 
+bool MacInput::PostMouseButton(bool rightButton, bool buttonUp)
+{
+    CGPoint location = CGPointMake(0.0, 0.0);
+    if (CGEventRef current = CGEventCreate(nullptr))
+    {
+        location = CGEventGetLocation(current);
+        CFRelease(current);
+    }
+
+    const CGMouseButton button = rightButton ? kCGMouseButtonRight : kCGMouseButtonLeft;
+    CGEventType type;
+    if (rightButton)
+        type = buttonUp ? kCGEventRightMouseUp : kCGEventRightMouseDown;
+    else
+        type = buttonUp ? kCGEventLeftMouseUp : kCGEventLeftMouseDown;
+
+    CGEventRef event = CGEventCreateMouseEvent(nullptr, type, location, button);
+    if (event == nullptr)
+        return false;
+
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+    return true;
+}
+
 bool MacInput::IsKeyDown(int keyCode)
 {
     return CGEventSourceKeyState(
@@ -100,5 +125,12 @@ bool MacInput::GameRunning()
 
 bool MacInput::GameFocused()
 {
-    return IsRobloxApp([[NSWorkspace sharedWorkspace] frontmostApplication]);
+    NSRunningApplication* front = [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (IsRobloxApp(front))
+        return true;
+
+    // The menu sits on top of the game. That must not look like Roblox lost focus.
+    return front != nil &&
+        [front isEqual:[NSRunningApplication currentApplication]] &&
+        GameRunning();
 }

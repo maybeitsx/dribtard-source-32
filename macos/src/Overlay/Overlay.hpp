@@ -28,6 +28,10 @@ public:
     void SetPanelRect(float x, float y, float width, float height);
     void SetVisible(bool visible);
 
+    // While the clicker is posting mouse buttons, the panel must not receive
+    // them. Otherwise every injected click lands on the menu.
+    void SetPassMouseThrough(bool pass);
+
 private:
     Impl* m_Impl = nullptr;
 };

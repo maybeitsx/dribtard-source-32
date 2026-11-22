@@ -3,8 +3,8 @@
 #include "Configuration/Settings.hpp"
 #include "Keys.hpp"
 #include "Macro/BladeBallMacro.hpp"
+#include "Macro/ClickerMacro.hpp"
 #include "Macro/MacroEngine.hpp"
-#include "Macro/MoonwalkMacro.hpp"
 #include "Overlay/Overlay.hpp"
 #include "Platform/Hotkeys.hpp"
 #include "Platform/MacInput.hpp"
@@ -32,7 +32,7 @@ namespace
         AppConfig config{};
         Menu menu{};
         MacroEngine structure{};
-        MoonwalkEngine moonwalk{};
+        ClickerEngine clicker{};
         BladeBallEngine bladeBall{};
         HotkeyMonitor hotkeys{};
         Overlay overlay{};
@@ -40,7 +40,14 @@ namespace
         AppConfig lastSaved{};
         std::chrono::steady_clock::time_point lastSave{};
         std::chrono::steady_clock::time_point lastTapAttempt{};
-        bool moonwalkBlocked = false;
+        bool clickerBlockedUntilRelease = false;
+        bool clickerLatched = false;
+        bool clickerKeyWasDown = false;
+        int clickerSampleClicks = 0;
+        float clickerMeasuredCps = -1.0f;
+        std::chrono::steady_clock::time_point clickerSampleAt{};
+        std::chrono::steady_clock::time_point clickerUnfocusedSince{};
+        std::chrono::steady_clock::time_point clickerKeyUpSince{};
         bool started = false;
         bool quit = false;
         bool m_Terminating = false;
@@ -75,7 +82,7 @@ namespace
             started = false;
 
             structure.Stop();
-            moonwalk.Stop();
+            clicker.Stop();
             bladeBall.Stop();
             hotkeys.Stop();
 
@@ -90,9 +97,10 @@ namespace
             if (keyCode == Keys::F12)
             {
                 structure.EmergencyStop();
-                moonwalk.EmergencyStop();
+                clicker.EmergencyStop();
                 bladeBall.EmergencyStop();
-                moonwalkBlocked = true;
+                clickerBlockedUntilRelease = true;
+                clickerLatched = false;
                 return;
             }
 
@@ -115,6 +123,18 @@ namespace
             {
                 TryStartBladeBall();
                 return;
+            }
+
+            if (config.bladeBall.armed && config.bladeBall.hotkeyMode &&
+                keyCode != config.bladeBall.triggerKey)
+            {
+                CurveType curve{};
+                if (CurveTypeForHotkey(keyCode, curve))
+                {
+                    config.bladeBall.curveType = curve;
+                    config.bladeBall.customCurveAngle = false;
+                    return;
+                }
             }
 
             if (keyCode == config.macro.triggerKey)
@@ -141,7 +161,7 @@ namespace
         {
             if (config.bladeBall.armed || !Licensed())
                 return;
-            if (structure.IsRunning() || moonwalk.IsRunning() || bladeBall.IsRunning())
+            if (structure.IsRunning() || clicker.IsRunning() || bladeBall.IsRunning())
                 return;
             if (!MacInput::GameRunning() || !MacInput::GameFocused())
                 return;
@@ -154,7 +174,7 @@ namespace
         {
             if (!Licensed())
                 return;
-            if (structure.IsRunning() || moonwalk.IsRunning() || bladeBall.IsRunning())
+            if (structure.IsRunning() || bladeBall.IsRunning())
                 return;
             if (!MacInput::GameRunning() || !MacInput::GameFocused())
                 return;
@@ -191,46 +211,123 @@ namespace
                 HandleKey(key);
 
             const bool focused = MacInput::GameFocused();
+            const bool structureRunning = structure.IsRunning();
+
+            const bool capturing = menu.IsCapturingKey();
+            const bool keyDown = hotkeys.Running()
+                ? hotkeys.IsKeyDown(config.clicker.key)
+                : MacInput::IsKeyDown(config.clicker.key);
+            if (!keyDown)
+                clickerBlockedUntilRelease = false;
+
+            if (capturing)
+            {
+                clickerKeyWasDown = true;
+            }
+            else
+            {
+                const bool pressed = keyDown && !clickerKeyWasDown;
+                if (pressed &&
+                    !clickerBlockedUntilRelease &&
+                    config.clicker.mode == ClickerMode::Toggle)
+                {
+                    clickerLatched = !clickerLatched;
+                }
+                clickerKeyWasDown = keyDown;
+            }
+
+            const bool heldNow = keyDown && !capturing && !clickerBlockedUntilRelease;
+            bool engaged = false;
+            if (config.clicker.mode == ClickerMode::Toggle)
+            {
+                engaged = clickerLatched;
+            }
+            else
+            {
+                const auto keyNow = std::chrono::steady_clock::now();
+                if (heldNow || !clicker.IsRunning())
+                    clickerKeyUpSince = {};
+                else if (clickerKeyUpSince.time_since_epoch().count() == 0)
+                    clickerKeyUpSince = keyNow;
+
+                const bool releaseGrace =
+                    clicker.IsRunning() &&
+                    clickerKeyUpSince.time_since_epoch().count() != 0 &&
+                    keyNow - clickerKeyUpSince < std::chrono::milliseconds(150);
+                engaged = heldNow || releaseGrace;
+            }
+
+            const auto focusNow = std::chrono::steady_clock::now();
+            if (focused)
+                clickerUnfocusedSince = {};
+            else if (clickerUnfocusedSince.time_since_epoch().count() == 0)
+                clickerUnfocusedSince = focusNow;
+            const bool gameFocused = focused ||
+                (clicker.IsRunning() &&
+                    clickerUnfocusedSince.time_since_epoch().count() != 0 &&
+                    focusNow - clickerUnfocusedSince < std::chrono::milliseconds(500));
+
+            const bool clickerAllowed =
+                Licensed() &&
+                engaged &&
+                gameFocused &&
+                !structureRunning;
+
+            if (clickerAllowed && !clicker.IsRunning())
+            {
+                clicker.SetSettings(config.clicker);
+                clicker.Start();
+            }
+            else if (!clickerAllowed && clicker.IsRunning())
+            {
+                clicker.Stop();
+            }
+            else if (clicker.IsRunning())
+            {
+                clicker.SetSettings(config.clicker);
+            }
+
+            const int clicks = clicker.ClickCount();
+            const auto clickerNow = std::chrono::steady_clock::now();
+            if (clicks < clickerSampleClicks || !clicker.IsRunning())
+            {
+                clickerSampleClicks = clicks;
+                clickerSampleAt = clickerNow;
+                if (!clicker.IsRunning())
+                    clickerMeasuredCps = -1.0f;
+            }
+            else
+            {
+                const double sampleSeconds = std::chrono::duration<double>(
+                    clickerNow - clickerSampleAt).count();
+                if (sampleSeconds >= 0.25)
+                {
+                    clickerMeasuredCps = static_cast<float>(
+                        (clicks - clickerSampleClicks) / sampleSeconds);
+                    clickerSampleClicks = clicks;
+                    clickerSampleAt = clickerNow;
+                }
+            }
+
+            const int clickerPause =
+                (engaged && !clicker.IsRunning() && !gameFocused) ? 1 :
+                (engaged && !clicker.IsRunning() && structureRunning) ? 2 :
+                0;
+
+            overlay.SetPassMouseThrough(clicker.IsRunning());
 
             AppStatus status;
             status.gameRunning = MacInput::GameRunning();
             status.gameFocused = focused;
-            status.structureRunning = structure.IsRunning();
-            status.moonwalkRunning = moonwalk.IsRunning();
+            status.structureRunning = structureRunning;
+            status.clickerRunning = clicker.IsRunning();
+            status.clickerEngaged = engaged;
+            status.clickerClicks = clicks;
+            status.clickerMeasuredCps = clickerMeasuredCps;
+            status.clickerPause = clickerPause;
             status.bladeBallRunning = bladeBall.IsRunning();
             status.parries = bladeBall.ParryCount();
             menu.SetStatus(status);
-
-            // Moonwalk is a hold loop: it runs while its key is down, never
-            // alongside another engine, and only with the game focused. The
-            // tap's own key state is used when it is running: it sees keys
-            // aimed at the game, where CGEventSourceKeyState can report the
-            // key as up.
-            const bool holdKeyDown = hotkeys.Running()
-                ? hotkeys.IsKeyDown(config.moonwalk.holdKey)
-                : MacInput::IsKeyDown(config.moonwalk.holdKey);
-
-            const bool held = !menu.IsCapturingKey() &&
-                !config.bladeBall.armed &&
-                focused &&
-                holdKeyDown;
-
-            if (!held)
-                moonwalkBlocked = false;
-
-            const bool moonwalkAllowed =
-                held && !moonwalkBlocked && !structure.IsRunning();
-
-            if (moonwalkAllowed && !moonwalk.IsRunning())
-            {
-                moonwalk.SetSettings(config.moonwalk);
-                if (!moonwalk.Start())
-                    moonwalkBlocked = true;
-            }
-            else if ((!moonwalkAllowed || moonwalkBlocked) && moonwalk.IsRunning())
-            {
-                moonwalk.Stop();
-            }
 
             MenuActions actions;
             menu.Draw(config, actions);

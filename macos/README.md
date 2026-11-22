@@ -8,7 +8,7 @@ folder is compiled by it. The only shared item is the vendored Dear ImGui copy i
 Everything the macro does on macOS goes through CoreGraphics/AppKit instead of
 Win32: a CGEventTap for global keys, CGEvent keyboard/mouse injection, an
 always-on-top NSPanel with a Metal view for the menu, and `CGEventSourceKeyState`
-for the Moonwalk hold key.
+for the clicker's hold key.
 
 ## Requirements
 
@@ -82,16 +82,22 @@ above cannot do it. The workflow already packages the helper into the artifact.
 ## What it does
 
 - **General** – the same four curve presets (Upwards / Backwards / Right / Left),
-  custom angles, Roblox sensitivity, counts per degree, delay before the block,
-  camera return, and the optional 1–4 curve hotkeys. Trigger `C`, ability `Q`,
-  block `F` by default.
-- **Moonwalk Tech** – hold `X` and the A/D tap loop runs (55 ms per direction,
-  5 ms gap, never both at once).
-- **Blade Ball** – the armed curve parry, matching the Windows 1.1.7 behaviour:
-  sweep the flick, then parry at the end of it with a fixed 20 ms hold, its own
-  Roblox sensitivity and flick angles (separate from the General page), optional
-  ability follow-up, timing jitter, camera return. There is no parry ticker, no
-  parry position, no parry hold control and no shield timer.
+  custom angles, a Roblox slider (0-10) and box value (the engine decimal,
+  0.001-100), counts per degree, delay before the block, camera return, and the
+  optional 1-4 curve hotkeys. Trigger `C`, ability `Q`, block `F` by default.
+- **Clicker** – hold or toggle `X` for a left or right click stream, 1 to 1500 CPS
+  (default 16). Every rate uses the same path: press, hold about a third of the
+  gap so the game can sample it, release, then spin out the rest of 1/CPS. The
+  Structure curve pauses it. Blade Ball does not. A focus blip under 500 ms, or
+  a hold-key blip under 150 ms, does not stop a running stream. F12 stops it
+  and will not restart a hold until the key is released.
+- **Blade Ball** – the armed curve parry, matching the Windows 1.1.13 behaviour:
+  sweep the flick (the sweep is three quarters of the duration you set), then
+  parry at the end of it with a fixed 20 ms hold. Hotkey mode (1 Up, 2 Back,
+  3 Left, 4 Right) and the four presets (Up 10/60, Back 180/35, Right 70/18,
+  Left -70/18) apply only while armed. Custom angle keeps your own degrees.
+  Its Roblox slider and box value are separate from the General page. Optional
+  ability follow-up and camera return. There is no timing jitter.
 - **Settings** – menu key (`\`), accent colour, panel opacity, quit.
 - **F12** is the emergency stop in every mode and cannot be rebound.
 - Settings persist to `~/Library/Application Support/dribtard/last.json`,
@@ -104,9 +110,9 @@ above cannot do it. The workflow already packages the helper into the artifact.
 - **No auto-updater and no Spotify widget.**
 - **One screen.** The overlay covers the main display; multi-display setups and
   Spaces switching during a macro are not handled yet.
-- **Focus.** Clicking the panel makes dribtard frontmost until you click the game
-  again, because on macOS a window must be key to receive typing. The engines
-  refuse to start while Roblox is not frontmost, exactly like Windows.
+- **Focus.** The menu sitting in front still counts as the game being focused
+  while Roblox is running, so clicking the panel does not pause the clicker.
+  The engines still refuse to start when some other app is frontmost.
 - **Game detection** uses the macOS client (bundle id prefix `com.roblox`, or the
   app name `Roblox`), not the Windows process name.
 - **Settings are not interchangeable** with Windows: key codes are macOS virtual
@@ -120,7 +126,7 @@ macos/
   Info.plist              accessory app bundle
   src/App.mm              engines, gating, autosave, AppKit delegate
   src/Keys.{hpp,cpp}      macOS key codes and labels
-  src/Macro/              structure, Moonwalk and Blade Ball engines
+  src/Macro/              structure, clicker and Blade Ball engines
   src/Platform/MacInput   CGEvent injection, key state, Roblox detection
   src/Platform/Hotkeys    listen-only CGEventTap hotkey monitor
   src/Overlay/            transparent NSPanel + Metal + Dear ImGui frame loop
@@ -131,9 +137,8 @@ macos/
 
 ## Verification status
 
-This port was written on a Windows machine that has no macOS toolchain, so the
-Xcode/CMake build has **not** been compiled or run. The pure-C++ sources
-(engines, key table, settings, menu, tests) were syntax-checked on the host; the
-Objective-C++ shell (AppKit window, Metal backends, CGEvent tap) has not been
-compiled at all. Expect to fix small compile issues on the first macOS build, and
-test the permission flow and a real game session before shipping it.
+This port tracks the Windows 1.1.13 feature set (clicker, camera scale, Blade Ball
+presets). It was written on a Windows machine that has no macOS toolchain, so the
+Xcode/CMake build has **not** been compiled or run here. GitHub Actions builds
+`macos/` on a Mac runner when that tree is pushed. Expect to test the permission
+flow and a real game session before shipping it.

@@ -37,7 +37,7 @@ public:
         MacInput::IsKeyDown asks CGEventSourceKeyState the same question, but
         that needs the same Accessibility / Input Monitoring grant the tap
         needs and can answer false for keys aimed at the game. The tap sees
-        every key whatever is frontmost, so the hold-triggered Moonwalk reads
+        every key whatever is frontmost, so the clicker's hold key reads
         it from here whenever the tap is running.
     */
     bool IsKeyDown(int keyCode) const;

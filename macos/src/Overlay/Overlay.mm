@@ -21,6 +21,7 @@ struct Overlay::Impl
     float panel[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     bool visible = true;
     bool clickThrough = true;
+    bool passMouse = false;
 };
 
 @interface DribtardPanel : NSPanel
@@ -121,7 +122,7 @@ namespace
         if (window == nil)
             return;
 
-        const bool ignore = !impl->visible || !PointerOverPanel(impl);
+        const bool ignore = impl->passMouse || !impl->visible || !PointerOverPanel(impl);
         if (ignore != impl->clickThrough)
         {
             window.ignoresMouseEvents = ignore;
@@ -247,6 +248,8 @@ bool Overlay::Init(Contents contents)
         id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown
                                                           handler:^NSEvent* (NSEvent* event)
         {
+            if (m_Impl != nullptr && m_Impl->passMouse)
+                return event;
             [panel makeKeyWindow];
             return event;
         }];
@@ -283,6 +286,12 @@ void Overlay::SetPanelRect(float x, float y, float width, float height)
     m_Impl->panel[1] = y;
     m_Impl->panel[2] = width;
     m_Impl->panel[3] = height;
+}
+
+void Overlay::SetPassMouseThrough(bool pass)
+{
+    if (m_Impl != nullptr)
+        m_Impl->passMouse = pass;
 }
 
 void Overlay::SetVisible(bool visible)

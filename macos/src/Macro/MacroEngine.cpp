@@ -24,9 +24,13 @@ MacroSettings GetEffectiveCurveSettings(const MacroSettings& settings)
 
 double GetCurrentMultiplier(double userRobloxSensitivity)
 {
-    const double clamped = std::isnan(userRobloxSensitivity)
+    double clamped = std::isnan(userRobloxSensitivity)
         ? kMinRobloxSensitivity
-        : std::max(kMinRobloxSensitivity, userRobloxSensitivity);
+        : userRobloxSensitivity;
+    if (clamped < kMinRobloxSensitivity)
+        clamped = kMinRobloxSensitivity;
+    if (clamped > kMaxRobloxSensitivity)
+        clamped = kMaxRobloxSensitivity;
     return 1.0 / clamped;
 }
 
@@ -174,10 +178,11 @@ void MacroEngine::SleepInterruptible(double seconds)
 
 void MacroEngine::Run(MacroSettings settings)
 {
-    const double currentMultiplier = GetCurrentMultiplier(settings.robloxSensitivity);
-    const double countsPerDegree = settings.mouseCountsPerDegree;
-    const double horizontalCounts = settings.horizontalDegrees * countsPerDegree * currentMultiplier;
-    const double verticalCountsPerDegree = countsPerDegree * currentMultiplier * kVerticalCountsPerDegreeScale;
+    const double horizontalCountsPerDegree = HorizontalCountsPerDegree(
+        settings.robloxSensitivity, settings.mouseCountsPerDegree);
+    const double verticalCountsPerDegree = VerticalCountsPerDegree(
+        settings.robloxSensitivity, settings.mouseCountsPerDegree);
+    const double horizontalCounts = settings.horizontalDegrees * horizontalCountsPerDegree;
     const double verticalCounts = -settings.verticalDegrees * verticalCountsPerDegree;
     const int moveX = static_cast<int>(std::llround(horizontalCounts));
     const int moveY = static_cast<int>(std::llround(verticalCounts));

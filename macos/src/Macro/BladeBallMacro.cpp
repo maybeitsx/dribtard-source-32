@@ -5,27 +5,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <random>
 #include <utility>
 #include <vector>
-
-namespace
-{
-    // Uniform +/- jitter, so the input is not a perfect metronome.
-    int JitterMs(std::mt19937& rng, int jitterMs)
-    {
-        if (jitterMs <= 0)
-            return 0;
-        std::uniform_int_distribution<int> dist(-jitterMs, jitterMs);
-        return dist(rng);
-    }
-
-    std::mt19937 MakeRng()
-    {
-        std::random_device device;
-        return std::mt19937(device());
-    }
-}
 
 BladeBallEngine::BladeBallEngine()
     : BladeBallEngine(MacroInputBackend{ MacInput::PostKey, MacInput::PostMouseMove, nullptr, nullptr })
@@ -73,7 +54,7 @@ bool BladeBallEngine::StartParry()
         if (m_LicenseValidator && !m_LicenseValidator())
             return false;
 
-        settings = m_Settings;
+        settings = EffectiveParrySettings(m_Settings);
     }
 
     if (m_Worker.joinable())
@@ -150,16 +131,15 @@ void BladeBallEngine::SleepInterruptibleMs(int milliseconds)
 
 void BladeBallEngine::RunParry(BladeBallSettings settings)
 {
-    const double countsPerDegree =
-        settings.mouseCountsPerDegree * GetCurrentMultiplier(settings.robloxSensitivity);
+    const double countsPerDegree = HorizontalCountsPerDegree(
+        settings.robloxSensitivity, settings.mouseCountsPerDegree);
     const int moveX = static_cast<int>(
         std::llround(settings.horizontalDegrees * countsPerDegree));
-    // Roblox turns 4/3 as many vertical counts per degree as horizontal ones.
-    const double verticalCountsPerDegree = countsPerDegree * kVerticalCountsPerDegreeScale;
+    const double verticalCountsPerDegree = VerticalCountsPerDegree(
+        settings.robloxSensitivity, settings.mouseCountsPerDegree);
     const int moveY = static_cast<int>(
         std::llround(-settings.verticalDegrees * verticalCountsPerDegree));
 
-    std::mt19937 rng = MakeRng();
     int sentX = 0;
     int sentY = 0;
     std::vector<int> heldKeys;
@@ -189,8 +169,7 @@ void BladeBallEngine::RunParry(BladeBallSettings settings)
     };
     auto waitSeconds = [&](double seconds)
     {
-        const int ms = std::max(0, static_cast<int>(std::lround(seconds * 1000.0)) +
-            JitterMs(rng, settings.jitterMs));
+        const int ms = std::max(0, static_cast<int>(std::lround(seconds * 1000.0)));
         SleepInterruptibleMs(ms);
     };
     auto moveTo = [&](double fraction)
@@ -254,7 +233,7 @@ void BladeBallEngine::RunParry(BladeBallSettings settings)
             return;
         }
 
-        const double flickSeconds = std::max(0.0, settings.flickDurationSeconds);
+        const double flickSeconds = std::max(0.0, settings.flickDurationSeconds) * 0.75;
         const int steps = std::max(1, static_cast<int>(std::ceil(flickSeconds * 120.0)));
         const double stepSeconds = flickSeconds / steps;
 

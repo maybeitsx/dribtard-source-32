@@ -8,7 +8,11 @@ struct AppStatus
     bool gameRunning = false;
     bool gameFocused = false;
     bool structureRunning = false;
-    bool moonwalkRunning = false;
+    bool clickerRunning = false;
+    bool clickerEngaged = false;
+    int clickerClicks = 0;
+    float clickerMeasuredCps = -1.0f;
+    int clickerPause = 0;
     bool bladeBallRunning = false;
     int parries = 0;
 };
@@ -47,7 +51,7 @@ private:
     enum class Page
     {
         General,
-        Moonwalk,
+        Clicker,
         BladeBall,
         Settings
     };
@@ -59,7 +63,7 @@ private:
         TriggerKey,
         ActivationKey,
         SecondaryKey,
-        MoonwalkHold,
+        ClickerKey,
         BladeBallTrigger,
         BladeBallParry,
         BladeBallAbility
@@ -67,7 +71,7 @@ private:
 
     void DrawRail(float height);
     void DrawGeneralPage(AppConfig& config, MenuActions& actions);
-    void DrawMoonwalkPage(AppConfig& config);
+    void DrawClickerPage(AppConfig& config);
     void DrawBladeBallPage(AppConfig& config);
     void DrawSettingsPage(AppConfig& config, MenuActions& actions);
 

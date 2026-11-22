@@ -105,14 +105,64 @@ inline bool CurveTypeForHotkey(int key, CurveType& out)
 
 MacroSettings GetEffectiveCurveSettings(const MacroSettings& settings);
 
-// Smallest Roblox sensitivity used in the inverse; 0.0 would divide by zero.
-inline constexpr double kMinRobloxSensitivity = 0.01;
+// Smallest Roblox sensitivity used in the inverse. The settings box allows
+// 0.001 to 100; 0 would divide by zero.
+inline constexpr double kMinRobloxSensitivity = 0.001;
+inline constexpr double kMaxRobloxSensitivity = 100.0;
 // Roblox clamps camera pitch to +/-80 degrees and discards counts past it.
 inline constexpr double kRobloxPitchLimitDegrees = 80.0;
-// Roblox turns 0.0015*pi rad per vertical count versus 0.002*pi horizontal,
-// so vertical needs 4/3 as many counts per degree.
-inline constexpr double kVerticalCountsPerDegreeScale = 4.0 / 3.0;
+// Current camera: a vertical count turns 0.77 as far as a horizontal count.
+inline constexpr double kMouseVerticalTurnScale = 0.77;
+// 0.5 degrees per horizontal count at sensitivity 1. The counts-per-degree
+// setting of 5 is a neutral pointer-speed trim on top of that.
+inline constexpr double kMouseDegreesPerCountX = 0.5;
+inline constexpr double kNeutralPointerCountsPerDegree = 5.0;
 double GetCurrentMultiplier(double userRobloxSensitivity);
+
+inline double PointerSpeedScale(double mouseCountsPerDegree)
+{
+    const double counts = mouseCountsPerDegree > 0.0
+        ? mouseCountsPerDegree
+        : kNeutralPointerCountsPerDegree;
+    return counts / kNeutralPointerCountsPerDegree;
+}
+
+inline double HorizontalCountsPerDegree(double sensitivity, double mouseCountsPerDegree)
+{
+    return (1.0 / kMouseDegreesPerCountX)
+        * PointerSpeedScale(mouseCountsPerDegree)
+        * GetCurrentMultiplier(sensitivity);
+}
+
+inline double VerticalCountsPerDegree(double sensitivity, double mouseCountsPerDegree)
+{
+    return HorizontalCountsPerDegree(sensitivity, mouseCountsPerDegree)
+        / kMouseVerticalTurnScale;
+}
+
+// Roblox's camera-sensitivity bar is 0-10. Notches 0-5 are 0.2-1, notches
+// 5-10 are 1-4. The box shows the engine value, not the notch.
+inline double RobloxSliderToEngine(double slider)
+{
+    const double s = slider < 0.0 ? 0.0 : (slider > 10.0 ? 10.0 : slider);
+    const double engine = (s <= 5.0) ? (0.16 * s + 0.2) : (0.6 * s - 2.0);
+    if (engine < kMinRobloxSensitivity)
+        return kMinRobloxSensitivity;
+    if (engine > kMaxRobloxSensitivity)
+        return kMaxRobloxSensitivity;
+    return engine;
+}
+
+inline double RobloxEngineToSlider(double engine)
+{
+    if (!(engine > 0.2))
+        return 0.0;
+    if (engine <= 1.0)
+        return (engine - 0.2) / 0.16;
+    if (engine >= 4.0)
+        return 10.0;
+    return (engine + 2.0) / 0.6;
+}
 int GetVerticalReturnCounts(const MacroSettings& settings, int sentY);
 
 // Injectable input boundary so tests can verify the sequence without sending

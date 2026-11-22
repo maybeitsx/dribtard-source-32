@@ -2,6 +2,7 @@
 
 #include "MacroEngine.hpp"
 
+#include <array>
 #include <atomic>
 #include <functional>
 #include <mutex>
@@ -18,6 +19,30 @@ inline constexpr int kParryWhiffCooldownMs = 2000;
 // The 500 ms shield starts at the press, so the hold only has to be long
 // enough for the game to register a block.
 inline constexpr double kParryHoldSeconds = 0.020;
+
+struct ParryCurvePreset
+{
+    const char* name;
+    double horizontalDegrees;
+    double verticalDegrees;
+};
+
+// Order matches CurveType: Upwards, Backwards, Right, Left.
+inline constexpr std::array<ParryCurvePreset, 4> kParryCurvePresets{{
+    { "Up", 10.0, 60.0 },
+    { "Back", 180.0, 35.0 },
+    { "Right", 70.0, 18.0 },
+    { "Left", -70.0, 18.0 }
+}};
+
+inline const ParryCurvePreset& ParryCurvePresetFor(CurveType type)
+{
+    const std::size_t index = static_cast<std::size_t>(type);
+    return kParryCurvePresets[
+        index < kParryCurvePresets.size()
+            ? index
+            : static_cast<std::size_t>(CurveType::Right)];
+}
 
 struct BladeBallSettings
 {
@@ -36,13 +61,26 @@ struct BladeBallSettings
     double mouseCountsPerDegree = 5.0;
     bool restoreCamera = true;
 
-    // +/- randomisation of every wait so the input is not a metronome.
-    int jitterMs = 3;
+    CurveType curveType = CurveType::Right;
+    bool customCurveAngle = true;
+    bool hotkeyMode = false;
 
-    // While armed the Blade Ball keys are live and the other macros are
+    // While armed the Blade Ball keys are live and the Structure curve is
     // refused, so two curves can never fire in the same game.
     bool armed = false;
 };
+
+inline BladeBallSettings EffectiveParrySettings(const BladeBallSettings& settings)
+{
+    BladeBallSettings effective = settings;
+    if (!settings.customCurveAngle)
+    {
+        const ParryCurvePreset& preset = ParryCurvePresetFor(settings.curveType);
+        effective.horizontalDegrees = preset.horizontalDegrees;
+        effective.verticalDegrees = preset.verticalDegrees;
+    }
+    return effective;
+}
 
 class BladeBallEngine
 {

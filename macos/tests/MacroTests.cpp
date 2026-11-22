@@ -1,9 +1,10 @@
 #include "Keys.hpp"
 #include "Macro/BladeBallMacro.hpp"
 #include "Macro/MacroEngine.hpp"
-#include "Macro/MoonwalkMacro.hpp"
+#include "Macro/ClickerMacro.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <mutex>
@@ -140,7 +141,7 @@ int main()
         // Defaults and preset lookup.
         {
             Check(GetCurrentMultiplier(0.625) == 1.6, "1 / sensitivity must scale the flick");
-            Check(GetCurrentMultiplier(0.0) == 100.0, "Sensitivity must clamp to 0.01");
+            Check(GetCurrentMultiplier(0.0) == 1000.0, "Sensitivity must clamp to 0.001");
 
             CurveType curve = CurveType::Upwards;
             Check(CurveTypeForHotkey(Keys::Two, curve) && curve == CurveType::Backwards,
@@ -192,11 +193,11 @@ int main()
 
             const std::vector<Event> events = recorder.Snapshot();
             Check(!events.empty(), "Structure macro sent nothing");
-            Check(events.front().kind == Kind::Mouse && events.front().a == 240,
-                "First input must be the 240-count curve");
+            Check(events.front().kind == Kind::Mouse && events.front().a == 96,
+                "First input must be the 96-count curve");
 
             const int qDown = FirstIndex(events, Kind::Key, settings.activationKey, false);
-            const int firstReturn = FirstIndex(events, Kind::Mouse, -240, false);
+            const int firstReturn = FirstIndex(events, Kind::Mouse, -96, false);
             const int firstBlock = FirstIndex(events, Kind::Key, settings.secondaryKey, false);
             const int secondBlock = FirstIndex(events, Kind::Key, settings.secondaryKey, false,
                 firstBlock + 1);
@@ -210,22 +211,28 @@ int main()
             Check(!AnyKeyDown(events), "Structure macro left a key held");
         }
 
-        // Moonwalk loop taps A and D without ever holding both.
+        // Clicker repeats at the requested rate and stops cleanly.
         {
-            Recorder recorder;
-            MoonwalkEngine engine(recorder.Backend());
+            std::atomic<int> clicks{ 0 };
+            ClickerEngine engine([&](bool) {
+                clicks.fetch_add(1, std::memory_order_relaxed);
+                return true;
+            });
 
-            Check(engine.Start(), "Moonwalk must start");
-            WaitForEvents(recorder, 6);
+            ClickerSettings settings;
+            settings.cps = 200;
+            engine.SetSettings(settings);
+
+            Check(engine.Start(), "Clicker must start");
+            std::this_thread::sleep_for(80ms);
             engine.Stop();
 
-            const std::vector<Event> events = recorder.Snapshot();
-            Check(events.size() >= 6, "Moonwalk did not repeat");
-            Check(!AnyKeyDown(events), "Moonwalk left a key held");
+            Check(clicks.load() >= 8, "Clicker must repeat");
+            Check(!engine.IsRunning(), "Stop must end the clicker");
 
-            const int aTaps = FirstIndex(events, Kind::Key, Keys::A, false) >= 0;
-            const int dTaps = FirstIndex(events, Kind::Key, Keys::D, false) >= 0;
-            Check(aTaps && dTaps, "Moonwalk must tap both directions");
+            ClickerEngine refused;
+            refused.SetLicenseValidator([]() { return false; });
+            Check(!refused.Start(), "Clicker must refuse an invalid license");
         }
 
         // Blade Ball: sweep first, parry at the end, hold 20 ms, return.
@@ -239,7 +246,6 @@ int main()
             settings.robloxSensitivity = 0.625;
             settings.mouseCountsPerDegree = 5.0;
             settings.flickDurationSeconds = 0.08;
-            settings.jitterMs = 0;
             settings.abilityEnabled = false;
             engine.SetSettings(settings);
 
@@ -250,10 +256,10 @@ int main()
             const std::vector<Event> events = recorder.Snapshot();
             const int parryDown = FirstIndex(events, Kind::Key, settings.parryKey, false);
             const int parryUp = FirstIndex(events, Kind::Key, settings.parryKey, true);
-            const int firstReturn = FirstIndex(events, Kind::Mouse, -240, false);
+            const int firstReturn = FirstIndex(events, Kind::Mouse, -96, false);
 
             Check(parryDown >= 0 && parryUp > parryDown, "Parry must be pressed and released");
-            Check(SumMouse(events, 0, static_cast<std::size_t>(parryDown)) == 240,
+            Check(SumMouse(events, 0, static_cast<std::size_t>(parryDown)) == 96,
                 "The parry must be pressed after the full sweep");
             Check(firstReturn > parryDown, "Camera return must follow the parry");
             Check(SumMouse(events, 0, events.size()) == 0,
@@ -271,7 +277,6 @@ int main()
 
             BladeBallSettings settings;
             settings.flickDurationSeconds = 0.02;
-            settings.jitterMs = 0;
             settings.abilityEnabled = true;
             settings.abilityDelaySeconds = 0.01;
             engine.SetSettings(settings);
@@ -282,7 +287,7 @@ int main()
 
             const std::vector<Event> events = recorder.Snapshot();
             const int abilityDown = FirstIndex(events, Kind::Key, settings.abilityKey, false);
-            const int lastReturn = FirstIndex(events, Kind::Mouse, -240, false);
+            const int lastReturn = FirstIndex(events, Kind::Mouse, -96, false);
             Check(abilityDown > lastReturn && lastReturn >= 0,
                 "Ability must be tapped after the camera return");
         }
@@ -300,7 +305,6 @@ int main()
             BladeBallEngine running(second.Backend());
             BladeBallSettings slow;
             slow.flickDurationSeconds = 0.4;
-            slow.jitterMs = 0;
             running.SetSettings(slow);
 
             Check(running.StartParry(), "Slow parry must start");
@@ -309,7 +313,7 @@ int main()
             Check(!running.IsRunning(), "Stop must end the parry");
         }
 
-        std::cout << "macOS engine tests passed (curve, moonwalk, blade ball, gates)\n";
+        std::cout << "macOS engine tests passed (curve, clicker, blade ball, gates)\n";
         return 0;
     }
     catch (const std::exception& error)

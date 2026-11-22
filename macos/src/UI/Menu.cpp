@@ -1,6 +1,7 @@
 #include "UI/Menu.hpp"
 
 #include "Keys.hpp"
+#include "Macro/MacroEngine.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -24,7 +25,20 @@ namespace
 
     void ClampSensitivity(double& value)
     {
-        value = std::clamp(value, 0.01, 10.0);
+        value = std::clamp(value, kMinRobloxSensitivity, kMaxRobloxSensitivity);
+    }
+
+    void SensitivityFields(const char* id, double& sensitivity, float width)
+    {
+        float slider = static_cast<float>(RobloxEngineToSlider(sensitivity));
+        ImGui::PushID(id);
+        ImGui::SetNextItemWidth(width);
+        if (ImGui::SliderFloat("Roblox slider", &slider, 0.0f, 10.0f, "%.2f"))
+            sensitivity = RobloxSliderToEngine(slider);
+        ImGui::SetNextItemWidth(width);
+        ImGui::InputDouble("Roblox box value", &sensitivity, 0.01, 0.1, "%.3f");
+        ClampSensitivity(sensitivity);
+        ImGui::PopID();
     }
 }
 
@@ -117,8 +131,8 @@ void Menu::CaptureKey(int keyCode, AppConfig& config)
     case Capture::SecondaryKey:
         config.macro.secondaryKey = keyCode;
         break;
-    case Capture::MoonwalkHold:
-        config.moonwalk.holdKey = keyCode;
+    case Capture::ClickerKey:
+        config.clicker.key = keyCode;
         break;
     case Capture::BladeBallTrigger:
         // The trigger must stay a key the macro itself does not press.
@@ -152,7 +166,7 @@ void Menu::DrawRail(float height)
     };
     const Slot slots[4] = {
         { "GEN", "General: camera curve and block key", Page::General },
-        { "MW", "Moonwalk Tech: hold-triggered A/D loop", Page::Moonwalk },
+        { "CLK", "Clicker: hold or toggle auto click", Page::Clicker },
         { "BB", "Blade Ball: armed curve parry", Page::BladeBall },
         { "SET", "Settings: menu key and appearance", Page::Settings }
     };
@@ -188,7 +202,7 @@ void Menu::DrawGeneralPage(AppConfig& config, MenuActions& actions)
 
     const float width = ImGui::GetContentRegionAvail().x;
 
-    BeginCard("##card_curve", width, 250.0f);
+    BeginCard("##card_curve", width, 320.0f);
     {
         CardHeader("Curve");
 
@@ -205,9 +219,7 @@ void Menu::DrawGeneralPage(AppConfig& config, MenuActions& actions)
             ImGui::InputDouble("Vertical (deg)", &config.macro.verticalDegrees, 5.0, 15.0, "%.1f");
         }
 
-        ImGui::SetNextItemWidth(width - 210.0f);
-        ImGui::InputDouble("Roblox sensitivity", &config.macro.robloxSensitivity, 0.05, 0.25, "%.3f");
-        ClampSensitivity(config.macro.robloxSensitivity);
+        SensitivityFields("structure", config.macro.robloxSensitivity, width - 210.0f);
 
         ImGui::SetNextItemWidth(width - 210.0f);
         ImGui::InputDouble("Counts per degree", &config.macro.mouseCountsPerDegree, 0.1, 1.0, "%.2f");
@@ -249,33 +261,61 @@ void Menu::DrawGeneralPage(AppConfig& config, MenuActions& actions)
         ImGui::TextDisabled("Needs Roblox focused and a granted Accessibility permission");
 }
 
-void Menu::DrawMoonwalkPage(AppConfig& config)
+void Menu::DrawClickerPage(AppConfig& config)
 {
-    PageTitle("Moonwalk Tech", "Hold the key and the loop repeats A / D taps");
+    PageTitle("Clicker", "Hold or toggle a click stream");
 
     StatusLine();
     ImGui::Spacing();
 
     const float width = ImGui::GetContentRegionAvail().x;
 
-    BeginCard("##card_moonwalk", width, 150.0f);
+    BeginCard("##card_clicker", width, 250.0f);
     {
-        CardHeader("Hold key");
-        KeyRow("moonwalk", "Hold key", "Taps A and D while held",
-            config.moonwalk.holdKey, Capture::MoonwalkHold, width - 24.0f);
+        CardHeader("Clicker");
+
+        int mode = config.clicker.mode == ClickerMode::Toggle ? 1 : 0;
+        if (ImGui::Combo("Mode", &mode, "Hold\0Toggle\0"))
+            config.clicker.mode = mode == 1 ? ClickerMode::Toggle : ClickerMode::Hold;
+
+        int button = config.clicker.button == ClickerButton::Right ? 1 : 0;
+        if (ImGui::Combo("Button", &button, "Left\0Right\0"))
+            config.clicker.button = button == 1 ? ClickerButton::Right : ClickerButton::Left;
+
+        ImGui::SetNextItemWidth(width - 210.0f);
+        ImGui::SliderInt("CPS", &config.clicker.cps, kClickerMinCps, kClickerMaxCps, "%d");
+        config.clicker.cps = ClampClickerCps(config.clicker.cps);
+
+        KeyRow("clicker", config.clicker.mode == ClickerMode::Toggle ? "Toggle key" : "Hold key",
+            "Starts and stops the click stream",
+            config.clicker.key, Capture::ClickerKey, width - 24.0f);
 
         ImGui::Spacing();
-        if (m_Status.moonwalkRunning)
-            ImGui::TextColored(AccentOf(config), "RUNNING");
+        if (m_Status.clickerRunning)
+        {
+            if (m_Status.clickerMeasuredCps >= 0.0f)
+                ImGui::TextColored(AccentOf(config), "RUNNING  %d clicks  %.0f cps",
+                    m_Status.clickerClicks, m_Status.clickerMeasuredCps);
+            else
+                ImGui::TextColored(AccentOf(config), "RUNNING  %d clicks", m_Status.clickerClicks);
+        }
+        else if (m_Status.clickerEngaged && m_Status.clickerPause == 1)
+            ImGui::TextDisabled("Paused: Roblox is not focused");
+        else if (m_Status.clickerEngaged && m_Status.clickerPause == 2)
+            ImGui::TextDisabled("Paused: the curve macro is running");
+        else if (config.clicker.mode == ClickerMode::Toggle)
+            ImGui::TextDisabled("Press %s to start, press it again to stop",
+                Keys::Name(config.clicker.key));
         else
-            ImGui::TextDisabled("Hold %s to run the loop", Keys::Name(config.moonwalk.holdKey));
+            ImGui::TextDisabled("Hold %s to click", Keys::Name(config.clicker.key));
     }
     EndCard();
 
     ImGui::Spacing();
     ImGui::TextWrapped(
-        "Each direction is held for 55 ms with a 5 ms gap, so A and D are never "
-        "down together. Releasing the key, leaving Roblox or F12 stops the loop.");
+        "Each click is held for part of the gap so the game can sample it, then "
+        "released for the rest of 1/CPS. The Structure curve pauses it. Blade Ball "
+        "does not. F12 stops it.");
 }
 
 void Menu::DrawBladeBallPage(AppConfig& config)
@@ -291,7 +331,7 @@ void Menu::DrawBladeBallPage(AppConfig& config)
         ImGui::Checkbox("Armed", &config.bladeBall.armed);
         ImGui::SameLine();
         ImGui::TextDisabled(config.bladeBall.armed
-            ? "Armed: other macros are refused"
+            ? "Armed: the structure curve is refused"
             : "Off: Blade Ball keys do nothing");
 
         KeyRow("bb_trigger", "Trigger key", "Runs one curve parry",
@@ -305,27 +345,41 @@ void Menu::DrawBladeBallPage(AppConfig& config)
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
 
-    BeginCard("##card_bb_curve", width, 216.0f);
+    BeginCard("##card_bb_curve", width, 360.0f);
     {
         CardHeader("Curve Parry");
 
-        ImGui::SetNextItemWidth(width - 210.0f);
-        ImGui::InputDouble("Flick horizontal (deg)", &config.bladeBall.horizontalDegrees, 5.0, 15.0, "%.1f");
-        ImGui::SetNextItemWidth(width - 210.0f);
-        ImGui::InputDouble("Flick vertical (deg)", &config.bladeBall.verticalDegrees, 5.0, 15.0, "%.1f");
+        ImGui::Checkbox("Hotkey Mode", &config.bladeBall.hotkeyMode);
+        ImGui::SameLine();
+        ImGui::TextDisabled("1 Up  2 Back  3 Left  4 Right");
+
+        int curve = static_cast<int>(config.bladeBall.curveType);
+        if (ImGui::Combo("Curve Type", &curve, "Upwards\0Backwards\0Right\0Left\0"))
+        {
+            config.bladeBall.curveType = static_cast<CurveType>(curve);
+            if (!config.bladeBall.customCurveAngle)
+            {
+                const ParryCurvePreset& preset = ParryCurvePresetFor(config.bladeBall.curveType);
+                config.bladeBall.horizontalDegrees = preset.horizontalDegrees;
+                config.bladeBall.verticalDegrees = preset.verticalDegrees;
+            }
+        }
+
+        ImGui::Checkbox("Custom angle", &config.bladeBall.customCurveAngle);
+        if (config.bladeBall.customCurveAngle)
+        {
+            ImGui::SetNextItemWidth(width - 210.0f);
+            ImGui::InputDouble("Flick horizontal (deg)", &config.bladeBall.horizontalDegrees, 5.0, 15.0, "%.1f");
+            ImGui::SetNextItemWidth(width - 210.0f);
+            ImGui::InputDouble("Flick vertical (deg)", &config.bladeBall.verticalDegrees, 5.0, 15.0, "%.1f");
+        }
+
         ImGui::SetNextItemWidth(width - 210.0f);
         ImGui::InputDouble("Flick duration (sec)", &config.bladeBall.flickDurationSeconds, 0.01, 0.05, "%.3f");
         config.bladeBall.flickDurationSeconds =
             std::clamp(config.bladeBall.flickDurationSeconds, 0.0, 10.0);
 
-        // The curve parry has its own sensitivity, independent of the General
-        // page: the flick is scaled by 1 / this value when it runs.
-        ImGui::SetNextItemWidth(width - 210.0f);
-        ImGui::InputDouble("Roblox sensitivity", &config.bladeBall.robloxSensitivity, 0.05, 0.25, "%.3f");
-        ClampSensitivity(config.bladeBall.robloxSensitivity);
-
-        ImGui::SetNextItemWidth(width - 210.0f);
-        ImGui::SliderInt("Timing jitter", &config.bladeBall.jitterMs, 0, 25, "+/- %d ms");
+        SensitivityFields("bladeball", config.bladeBall.robloxSensitivity, width - 210.0f);
 
         ImGui::Checkbox("Return camera", &config.bladeBall.restoreCamera);
         ImGui::SameLine();
@@ -450,8 +504,8 @@ void Menu::Draw(AppConfig& config, MenuActions& actions)
     case Page::General:
         DrawGeneralPage(config, actions);
         break;
-    case Page::Moonwalk:
-        DrawMoonwalkPage(config);
+    case Page::Clicker:
+        DrawClickerPage(config);
         break;
     case Page::BladeBall:
         DrawBladeBallPage(config);

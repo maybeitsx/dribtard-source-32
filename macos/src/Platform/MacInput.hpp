@@ -18,7 +18,10 @@ bool PostKey(int keyCode, bool keyUp);
 // what the camera turn consumes.
 bool PostMouseMove(int dx, int dy);
 
-// True while the physical key is down, used by the hold-triggered Moonwalk.
+// One mouse-button edge. rightButton selects the button; buttonUp releases it.
+bool PostMouseButton(bool rightButton, bool buttonUp);
+
+// True while the physical key is down. Used by the clicker's hold mode.
 bool IsKeyDown(int keyCode);
 
 // Accessibility / input monitoring permission state.

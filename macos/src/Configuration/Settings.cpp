@@ -191,8 +191,14 @@ bool Settings::Save(const AppConfig& config)
     AppendDouble(out, "secondaryHoldSeconds", m.secondaryHoldSeconds);
     AppendBool(out, "instantMode", m.instantMode);
     AppendBool(out, "restoreCamera", m.restoreCamera);
-    AppendInt(out, "moonwalkHoldKey", config.moonwalk.holdKey);
+    AppendInt(out, "clickerKey", config.clicker.key);
+    AppendInt(out, "clickerMode", config.clicker.mode == ClickerMode::Toggle ? 1 : 0);
+    AppendInt(out, "clickerButton", config.clicker.button == ClickerButton::Right ? 1 : 0);
+    AppendInt(out, "clickerCps", ClampClickerCps(config.clicker.cps));
     AppendBool(out, "bbArmed", bb.armed);
+    AppendBool(out, "bbHotkeyMode", bb.hotkeyMode);
+    AppendInt(out, "bbCurveType", static_cast<int>(bb.curveType));
+    AppendBool(out, "bbCustomCurve", bb.customCurveAngle);
     AppendInt(out, "bbTriggerKey", bb.triggerKey);
     AppendInt(out, "bbParryKey", bb.parryKey);
     AppendInt(out, "bbAbilityKey", bb.abilityKey);
@@ -204,7 +210,6 @@ bool Settings::Save(const AppConfig& config)
     AppendDouble(out, "bbSensitivity", bb.robloxSensitivity);
     AppendDouble(out, "bbCountsPerDegree", bb.mouseCountsPerDegree);
     AppendBool(out, "bbRestoreCamera", bb.restoreCamera);
-    AppendInt(out, "bbJitterMs", bb.jitterMs);
     AppendInt(out, "menuKey", ui.menuKey);
     AppendDouble(out, "accentR", static_cast<double>(ui.accentR));
     AppendDouble(out, "accentG", static_cast<double>(ui.accentG));
@@ -269,7 +274,7 @@ bool Settings::Load(AppConfig& config)
     if (ReadDouble(json, "horizontalDegrees", d)) m.horizontalDegrees = ClampDouble(d, -180.0, 180.0);
     if (ReadDouble(json, "verticalDegrees", d)) m.verticalDegrees = ClampDouble(d, -180.0, 180.0);
     if (ReadDouble(json, "rotationDurationSeconds", d)) m.rotationDurationSeconds = ClampDouble(d, 0.0, 10.0);
-    if (ReadDouble(json, "robloxSensitivity", d)) m.robloxSensitivity = ClampDouble(d, 0.01, 10.0);
+    if (ReadDouble(json, "robloxSensitivity", d)) m.robloxSensitivity = ClampDouble(d, 0.001, 100.0);
     if (ReadDouble(json, "mouseCountsPerDegree", d)) m.mouseCountsPerDegree = ClampDouble(d, 0.1, 100.0);
     if (ReadBool(json, "qBeforeCamera", b)) m.qBeforeCamera = b;
     if (ReadDouble(json, "activationHoldSeconds", d)) m.activationHoldSeconds = ClampDouble(d, 0.0, 10.0);
@@ -280,11 +285,23 @@ bool Settings::Load(AppConfig& config)
     if (ReadBool(json, "instantMode", b)) m.instantMode = b;
     if (ReadBool(json, "restoreCamera", b)) m.restoreCamera = b;
 
-    if (ReadInt(json, "moonwalkHoldKey", v))
-        parsed.moonwalk.holdKey = ClampInt(v, 0, 255);
+    if (ReadInt(json, "clickerKey", v))
+        parsed.clicker.key = ClampInt(v, 0, 255);
+    else if (ReadInt(json, "moonwalkHoldKey", v))
+        parsed.clicker.key = ClampInt(v, 0, 255);
+    if (ReadInt(json, "clickerMode", v))
+        parsed.clicker.mode = v == 1 ? ClickerMode::Toggle : ClickerMode::Hold;
+    if (ReadInt(json, "clickerButton", v))
+        parsed.clicker.button = v == 1 ? ClickerButton::Right : ClickerButton::Left;
+    if (ReadInt(json, "clickerCps", v))
+        parsed.clicker.cps = ClampClickerCps(v);
 
     BladeBallSettings& bb = parsed.bladeBall;
     if (ReadBool(json, "bbArmed", b)) bb.armed = b;
+    if (ReadBool(json, "bbHotkeyMode", b)) bb.hotkeyMode = b;
+    if (ReadInt(json, "bbCurveType", v) && v >= 0 && v <= 3)
+        bb.curveType = static_cast<CurveType>(v);
+    if (ReadBool(json, "bbCustomCurve", b)) bb.customCurveAngle = b;
     if (ReadInt(json, "bbTriggerKey", v)) bb.triggerKey = ClampInt(v, 0, 255);
     if (ReadInt(json, "bbParryKey", v)) bb.parryKey = ClampInt(v, 0, 255);
     if (ReadInt(json, "bbAbilityKey", v)) bb.abilityKey = ClampInt(v, 0, 255);
@@ -293,10 +310,9 @@ bool Settings::Load(AppConfig& config)
     if (ReadDouble(json, "bbHorizontal", d)) bb.horizontalDegrees = ClampDouble(d, -180.0, 180.0);
     if (ReadDouble(json, "bbVertical", d)) bb.verticalDegrees = ClampDouble(d, -180.0, 180.0);
     if (ReadDouble(json, "bbDuration", d)) bb.flickDurationSeconds = ClampDouble(d, 0.0, 10.0);
-    if (ReadDouble(json, "bbSensitivity", d)) bb.robloxSensitivity = ClampDouble(d, 0.01, 10.0);
+    if (ReadDouble(json, "bbSensitivity", d)) bb.robloxSensitivity = ClampDouble(d, 0.001, 100.0);
     if (ReadDouble(json, "bbCountsPerDegree", d)) bb.mouseCountsPerDegree = ClampDouble(d, 0.1, 100.0);
     if (ReadBool(json, "bbRestoreCamera", b)) bb.restoreCamera = b;
-    if (ReadInt(json, "bbJitterMs", v)) bb.jitterMs = ClampInt(v, 0, 50);
 
     // An old or hand-edited file can bind the trigger to the key the macro
     // presses. The game would then get two F presses for one parry, which looks

@@ -42,7 +42,7 @@ set(DRIBTARD_MAC_SOURCES
     src/Platform/MacInput.mm
     src/Platform/Hotkeys.mm
     src/Macro/MacroEngine.cpp
-    src/Macro/MoonwalkMacro.cpp
+    src/Macro/ClickerMacro.cpp
     src/Macro/BladeBallMacro.cpp
     src/Configuration/Settings.cpp
     src/UI/Menu.cpp
@@ -97,8 +97,8 @@ set_target_properties(dribtard-mac PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
     MACOSX_BUNDLE_BUNDLE_NAME "dribtard"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.dribtard.mac"
-    MACOSX_BUNDLE_BUNDLE_VERSION "1.1.7"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "1.1.7"
+    MACOSX_BUNDLE_BUNDLE_VERSION "1.1.13"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "1.1.13"
     XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}"
     XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME "NO"
 )
@@ -109,7 +109,7 @@ if(BUILD_TESTING)
         tests/MacroTests.cpp
         src/Keys.cpp
         src/Macro/MacroEngine.cpp
-        src/Macro/MoonwalkMacro.cpp
+        src/Macro/ClickerMacro.cpp
         src/Macro/BladeBallMacro.cpp
         src/Platform/MacInput.mm
     )
