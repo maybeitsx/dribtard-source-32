@@ -17,6 +17,8 @@ struct Overlay::Impl
     void* queue = nullptr;
     void* delegate = nullptr;
     void* mouseMonitor = nullptr;
+    void* keyMonitor = nullptr;
+    std::function<void(int)> keyHandler;
     Overlay::Contents contents;
     float panel[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     bool visible = true;
@@ -276,6 +278,18 @@ bool Overlay::Init(Contents contents)
         }];
         m_Impl->mouseMonitor = (__bridge_retained void*)monitor;
 
+        // Local key monitor: only events delivered to this app (the panel is
+        // key) reach it, so it needs no privacy grant. The app ignores it when
+        // the global tap is already delivering keys.
+        id keyMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+                                                             handler:^NSEvent* (NSEvent* event)
+        {
+            if (m_Impl != nullptr && m_Impl->keyHandler)
+                m_Impl->keyHandler(static_cast<int>(event.keyCode));
+            return event;
+        }];
+        m_Impl->keyMonitor = (__bridge_retained void*)keyMonitor;
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
@@ -350,6 +364,12 @@ void Overlay::SetPassMouseThrough(bool pass)
         m_Impl->passMouse = pass;
 }
 
+void Overlay::SetKeyHandler(std::function<void(int)> handler)
+{
+    if (m_Impl != nullptr)
+        m_Impl->keyHandler = std::move(handler);
+}
+
 void Overlay::SetVisible(bool visible)
 {
     if (m_Impl == nullptr)
@@ -378,6 +398,13 @@ void Overlay::Shutdown()
             [NSEvent removeMonitor:(__bridge id)m_Impl->mouseMonitor];
             CFRelease(m_Impl->mouseMonitor);
             m_Impl->mouseMonitor = nullptr;
+        }
+
+        if (m_Impl->keyMonitor != nullptr)
+        {
+            [NSEvent removeMonitor:(__bridge id)m_Impl->keyMonitor];
+            CFRelease(m_Impl->keyMonitor);
+            m_Impl->keyMonitor = nullptr;
         }
 
         if (m_Impl->view != nullptr)

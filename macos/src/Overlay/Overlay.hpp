@@ -32,6 +32,13 @@ public:
     // them. Otherwise every injected click lands on the menu.
     void SetPassMouseThrough(bool pass);
 
+    /*
+        Fallback for keys typed while the panel itself has focus. The global
+        tap is the primary path; this keeps the menu key working when Input
+        Monitoring is missing and the tap could not be created.
+    */
+    void SetKeyHandler(std::function<void(int)> handler);
+
 private:
     Impl* m_Impl = nullptr;
 };

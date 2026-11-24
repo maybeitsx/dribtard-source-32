@@ -113,6 +113,16 @@ void MacInput::RequestTrust()
     AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
 }
 
+bool MacInput::HasListenAccess()
+{
+    return CGPreflightListenEventAccess() != false;
+}
+
+bool MacInput::RequestListenAccess()
+{
+    return CGRequestListenEventAccess() != false;
+}
+
 bool MacInput::GameRunning()
 {
     for (NSRunningApplication* app in [[NSWorkspace sharedWorkspace] runningApplications])

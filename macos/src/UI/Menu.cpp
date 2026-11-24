@@ -250,7 +250,14 @@ void Menu::StatusPill(const AppConfig& config)
 
     ImVec4 dotColor;
     const char* text = "Roblox not detected";
-    if (m_Status.chatActive)
+    if (!m_Status.hotkeysActive)
+    {
+        // Every hotkey, including the menu key that closes this panel, needs
+        // the listen-only event tap.
+        dotColor = ImVec4(0.95f, 0.62f, 0.40f, 1.0f);
+        text = "Hotkeys off: allow Input Monitoring";
+    }
+    else if (m_Status.chatActive)
     {
         dotColor = ImVec4(0.95f, 0.78f, 0.45f, 1.0f);
         text = "Chat open - keybinds paused";

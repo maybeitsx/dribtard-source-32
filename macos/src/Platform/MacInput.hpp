@@ -28,6 +28,11 @@ bool IsKeyDown(int keyCode);
 bool IsTrusted();
 void RequestTrust();
 
+// A listen-only key tap needs the Input Monitoring privilege, not only
+// Accessibility. AppKit shows no prompt for it, so the app has to ask.
+bool HasListenAccess();
+bool RequestListenAccess();
+
 // Roblox detection: any running instance, and whether it is the frontmost app.
 bool GameRunning();
 bool GameFocused();

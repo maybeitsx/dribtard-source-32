@@ -20,6 +20,9 @@ struct AppStatus
     int parries = 0;
     // True while chat detection has the keybinds suspended ("/" until Enter).
     bool chatActive = false;
+    // False when the global key tap could not be created (no Input
+    // Monitoring), so the menu key and every macro hotkey are unavailable.
+    bool hotkeysActive = true;
 };
 
 struct MenuActions

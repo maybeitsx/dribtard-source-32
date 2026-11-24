@@ -55,9 +55,11 @@ First run
 
 The app is an accessory app: it has no Dock icon, just a floating panel.
 
-macOS will ask for Accessibility permission (System Settings ->
-Privacy & Security -> Accessibility). Turn dribtard on there. If the global
-keys still do nothing, also turn it on under Input Monitoring.
+macOS will ask for Accessibility and Input Monitoring (System Settings ->
+Privacy & Security). Turn dribtard on under both. Accessibility lets the app
+send keys to Roblox; Input Monitoring lets it see the menu key and the other
+hotkeys. Without Input Monitoring the menu key that closes the panel does
+nothing, and the panel says "Hotkeys off: allow Input Monitoring".
 
 The panel should then appear. If it does not, press the menu key, which is
 the backslash key ( \ ) by default.

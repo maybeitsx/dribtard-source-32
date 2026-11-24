@@ -66,11 +66,29 @@ namespace
             if (!MacInput::IsTrusted())
                 MacInput::RequestTrust();
 
+            // A listen-only key tap is covered by Input Monitoring, a separate
+            // grant from Accessibility. AppKit never prompts for it, so ask
+            // here: without it every hotkey, including the menu key, is dead.
+            if (!MacInput::HasListenAccess())
+                MacInput::RequestListenAccess();
+
             if (!overlay.Init([this]() { Frame(); }))
                 return false;
 
-            // Global hotkeys are optional: without Accessibility permission
-            // the tap cannot be created, and the menu still works.
+            overlay.SetKeyHandler([this](int keyCode)
+            {
+                // The global tap is the primary path. This fallback only runs
+                // while it is unavailable, so a press is never handled twice,
+                // and it keeps the menu key working when the panel itself has
+                // focus but Input Monitoring has not been granted.
+                if (hotkeys.Running())
+                    return;
+                if (keyCode == config.ui.menuKey)
+                    menu.SetVisible(!menu.Visible());
+            });
+
+            // Global hotkeys are optional: without the permissions the tap
+            // cannot be created, and the menu still works.
             hotkeys.Start();
 
             started = true;
@@ -378,6 +396,7 @@ namespace
             status.bladeBallRunning = bladeBall.IsRunning();
             status.parries = bladeBall.ParryCount();
             status.chatActive = chatActive;
+            status.hotkeysActive = hotkeys.Running();
             menu.SetStatus(status);
 
             MenuActions actions;

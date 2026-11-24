@@ -84,12 +84,14 @@ above cannot do it. The workflow already packages the helper into the artifact.
 
 1. Launch `dribtard-mac.app`. It is an accessory app: no Dock icon, just the
    floating panel.
-2. macOS asks for **Accessibility** permission, or you grant it in
-   System Settings → Privacy & Security → Accessibility. Without it the app
-   cannot post keys to Roblox and the global hotkeys do not fire; if they stay
-   dead after that, also enable **Input Monitoring**. The app retries its key
-   tap every two seconds, so granting the permission starts the menu key and
-   key capturing straight away — no relaunch needed.
+2. macOS asks for **Accessibility** and **Input Monitoring**. Grant both in
+   System Settings → Privacy & Security: Accessibility lets the app post keys
+   to Roblox, and Input Monitoring lets its listen-only tap see the menu key
+   and every other hotkey. Without Input Monitoring the tap cannot be created
+   at all, so the menu opens on launch but the key that closes it does nothing;
+   the panel's status line then reads "Hotkeys off: allow Input Monitoring".
+   The app retries its key tap every two seconds, so granting the permission
+   starts the menu key straight away — no relaunch needed.
 3. Click the Roblox window once so it is frontmost. The panel is click-through
    everywhere except its own card, so clicking the game normally still works.
 
