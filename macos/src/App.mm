@@ -57,6 +57,10 @@ namespace
 
         bool Licensed() const { return true; }
 
+        // Read by the status item menu so the customer can see whether the
+        // hotkeys are live before pressing a key to find out.
+        bool HotkeysRunning() const { return hotkeys.Running(); }
+
         bool Start()
         {
             // A missing or foreign file leaves the defaults in place.
@@ -491,7 +495,9 @@ namespace
     AppCore* g_Core = nullptr;
 }
 
-@interface DribtardAppDelegate : NSObject <NSApplicationDelegate>
+@interface DribtardAppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
+@property (nonatomic, strong) NSStatusItem* statusItem;
+@property (nonatomic, strong) NSMenuItem* hotkeysItem;
 @end
 
 @implementation DribtardAppDelegate
@@ -506,7 +512,120 @@ namespace
         delete g_Core;
         g_Core = nullptr;
         [NSApp terminate:nil];
+        return;
     }
+
+    [self installStatusItem];
+}
+
+/*
+    The menu bar icon. The panel is the app's only window and the app has no
+    Dock icon, so without this there is nothing left to click when the hotkeys
+    are unavailable or the panel is hidden. It also carries the two privacy
+    panes as menu items, which is the whole first-run setup: open the pane from
+    here and flip the switch macOS lists the app under.
+*/
+- (void)installStatusItem
+{
+    self.statusItem = [NSStatusBar.systemStatusBar
+        statusItemWithLength:NSVariableStatusItemLength];
+
+    NSStatusBarButton* button = self.statusItem.button;
+    NSImage* icon = [NSImage imageWithSystemSymbolName:@"cursorarrow.rays"
+                              accessibilityDescription:@"dribtard"];
+    if (icon != nil)
+        button.image = icon;
+    else
+        button.title = @"dribtard";
+
+    NSMenu* menu = [[NSMenu alloc] init];
+    menu.autoenablesItems = NO;
+    menu.delegate = self;
+
+    self.hotkeysItem = [[NSMenuItem alloc] initWithTitle:@"Hotkeys: off"
+                                                  action:nil
+                                           keyEquivalent:@""];
+    self.hotkeysItem.enabled = NO;
+    [menu addItem:self.hotkeysItem];
+
+    [menu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem* show = [[NSMenuItem alloc] initWithTitle:@"Show panel"
+                                                  action:@selector(showPanel:)
+                                           keyEquivalent:@""];
+    show.target = self;
+    [menu addItem:show];
+
+    NSMenuItem* listen = [[NSMenuItem alloc] initWithTitle:@"Allow Input Monitoring..."
+                                                    action:@selector(openInputMonitoring:)
+                                             keyEquivalent:@""];
+    listen.target = self;
+    [menu addItem:listen];
+
+    NSMenuItem* access = [[NSMenuItem alloc] initWithTitle:@"Allow Accessibility..."
+                                                    action:@selector(openAccessibility:)
+                                             keyEquivalent:@""];
+    access.target = self;
+    [menu addItem:access];
+
+    [menu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem* quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit dribtard"
+                                                      action:@selector(quitDribtard:)
+                                               keyEquivalent:@""];
+    quitItem.target = self;
+    [menu addItem:quitItem];
+
+    self.statusItem.menu = menu;
+
+    [self refreshStatusItem];
+}
+
+- (void)refreshStatusItem
+{
+    if (self.hotkeysItem == nil || g_Core == nullptr)
+        return;
+
+    self.hotkeysItem.title = g_Core->HotkeysRunning()
+        ? @"Hotkeys: on"
+        : @"Hotkeys: off - allow a permission below";
+}
+
+- (void)menuWillOpen:(NSMenu*)menu
+{
+    (void)menu;
+    [self refreshStatusItem];
+}
+
+- (void)showPanel:(id)sender
+{
+    (void)sender;
+
+    if (g_Core != nullptr)
+        g_Core->ShowMenu();
+}
+
+- (void)openInputMonitoring:(id)sender
+{
+    (void)sender;
+
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:
+        @"x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"]];
+}
+
+- (void)openAccessibility:(id)sender
+{
+    (void)sender;
+
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:
+        @"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"]];
+}
+
+- (void)quitDribtard:(id)sender
+{
+    (void)sender;
+
+    [NSApp terminate:nil];
 }
 
 - (void)applicationWillTerminate:(NSNotification*)notification
@@ -538,10 +657,16 @@ namespace
     return YES;
 }
 
+/*
+    The status item, the menu key and "Quit dribtard" can all quit or hide the
+    panel, so the app must not die just because its one window went away: that
+    is the state where nothing is left on screen and macOS has no second copy
+    to launch.
+*/
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender
 {
     (void)sender;
-    return YES;
+    return NO;
 }
 
 @end

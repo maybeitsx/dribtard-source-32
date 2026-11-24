@@ -83,7 +83,7 @@ above cannot do it. The workflow already packages the helper into the artifact.
 ## First run
 
 1. Launch `dribtard-mac.app`. It is an accessory app: no Dock icon, just the
-   floating panel.
+   floating panel and a cursor icon in the menu bar.
 2. macOS asks for **Accessibility** and **Input Monitoring**. Grant both in
    System Settings → Privacy & Security: Accessibility lets the app post keys
    to Roblox, and Input Monitoring lets its listen-only tap see the menu key
@@ -96,6 +96,10 @@ above cannot do it. The workflow already packages the helper into the artifact.
    needed. If the panel is ever hidden, opening the app again shows it, because
    macOS routes a second launch to the running copy instead of starting a new
    one.
+
+   The menu bar icon is the short path to all of this: it shows whether the
+   hotkeys are live, opens either privacy pane in one click (**Allow Input
+   Monitoring…**, **Allow Accessibility…**) and always offers **Show panel**.
 3. Click the Roblox window once so it is frontmost. The panel is click-through
    everywhere except its own card, so clicking the game normally still works.
 

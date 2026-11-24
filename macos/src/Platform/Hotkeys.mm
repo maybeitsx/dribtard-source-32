@@ -139,6 +139,25 @@ bool HotkeyMonitor::Start()
         TapCallback,
         this);
 
+    /*
+        Input Monitoring is only what a listen-only tap needs. An active tap is
+        covered by Accessibility, which this app already asks for and which
+        macro users have usually granted, so fall back to it instead of leaving
+        every hotkey dead for somebody who never found the Input Monitoring
+        pane. The callback returns each event untouched, so the game and the
+        rest of the system see exactly the same keys as before.
+    */
+    if (tap == nullptr)
+    {
+        tap = CGEventTapCreate(
+            kCGSessionEventTap,
+            kCGHeadInsertEventTap,
+            kCGEventTapOptionDefault,
+            mask,
+            TapCallback,
+            this);
+    }
+
     if (tap == nullptr)
         return false;
 
