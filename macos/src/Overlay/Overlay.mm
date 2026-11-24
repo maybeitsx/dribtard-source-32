@@ -17,6 +17,8 @@ struct Overlay::Impl
     void* queue = nullptr;
     void* delegate = nullptr;
     void* mouseMonitor = nullptr;
+    void* keyMonitor = nullptr;
+    std::function<void(int)> keyHandler;
     Overlay::Contents contents;
     float panel[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     bool visible = true;
@@ -67,37 +69,58 @@ namespace
             static_cast<float>(b) / 255.0f, static_cast<float>(a) / 255.0f);
     }
 
+    /*
+        The Windows theme, carried over value for value: the same rounding,
+        the same spacing, the same dark blue-black surfaces and the same
+        text colours. The accent-driven colours (grab, check mark) are pushed
+        per frame by the menu, so a custom accent reaches them too.
+    */
     void ApplyPalette()
     {
         ImGuiStyle& style = ImGui::GetStyle();
-        style.WindowRounding = 14.0f;
+        style.WindowPadding = ImVec2(10.0f, 10.0f);
+        style.FramePadding = ImVec2(10.0f, 3.0f);
+        style.ItemSpacing = ImVec2(8.0f, 4.0f);
+        style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
+        style.ScrollbarSize = 8.0f;
+        style.GrabMinSize = 8.0f;
+        style.WindowBorderSize = 1.0f;
+        style.ChildBorderSize = 1.0f;
+        style.FrameBorderSize = 1.0f;
+        style.PopupBorderSize = 1.0f;
+
+        style.AntiAliasedLines = true;
+        style.AntiAliasedLinesUseTex = true;
+        style.AntiAliasedFill = true;
+
+        style.WindowRounding = 12.0f;
         style.ChildRounding = 10.0f;
         style.FrameRounding = 7.0f;
         style.PopupRounding = 8.0f;
-        style.ScrollbarRounding = 8.0f;
-        style.GrabRounding = 7.0f;
-        style.WindowBorderSize = 1.0f;
-        style.FramePadding = ImVec2(8.0f, 4.0f);
-        style.ItemSpacing = ImVec2(8.0f, 6.0f);
-        style.WindowPadding = ImVec2(10.0f, 10.0f);
+        style.ScrollbarRounding = 6.0f;
+        style.GrabRounding = 6.0f;
+        style.TabRounding = 6.0f;
 
         ImVec4* colors = style.Colors;
-        colors[ImGuiCol_WindowBg] = ImColorOf(8, 15, 23, 225);
-        colors[ImGuiCol_ChildBg] = ImColorOf(14, 17, 33, 235);
-        colors[ImGuiCol_Border] = ImColorOf(255, 255, 255, 26);
-        colors[ImGuiCol_FrameBg] = ImColorOf(19, 19, 43, 255);
-        colors[ImGuiCol_FrameBgHovered] = ImColorOf(46, 33, 92, 255);
-        colors[ImGuiCol_FrameBgActive] = ImColorOf(63, 48, 122, 255);
-        colors[ImGuiCol_Button] = ImColorOf(26, 24, 51, 255);
-        colors[ImGuiCol_ButtonHovered] = ImColorOf(46, 33, 92, 255);
-        colors[ImGuiCol_ButtonActive] = ImColorOf(115, 97, 255, 255);
-        colors[ImGuiCol_Header] = ImColorOf(115, 97, 255, 90);
-        colors[ImGuiCol_SliderGrab] = ImColorOf(115, 97, 255, 255);
-        colors[ImGuiCol_SliderGrabActive] = ImColorOf(161, 146, 255, 255);
-        colors[ImGuiCol_CheckMark] = ImColorOf(161, 146, 255, 255);
-        colors[ImGuiCol_Separator] = ImColorOf(255, 255, 255, 22);
-        colors[ImGuiCol_Text] = ImColorOf(236, 236, 244, 255);
-        colors[ImGuiCol_TextDisabled] = ImColorOf(150, 152, 164, 255);
+        colors[ImGuiCol_WindowBg] = ImVec4(0.025f, 0.027f, 0.07f, 1.0f);
+        colors[ImGuiCol_ChildBg] = ImVec4(0.04f, 0.045f, 0.11f, 1.0f);
+        colors[ImGuiCol_PopupBg] = ImVec4(0.035f, 0.035f, 0.095f, 0.99f);
+        colors[ImGuiCol_FrameBg] = ImVec4(0.075f, 0.075f, 0.17f, 1.0f);
+        colors[ImGuiCol_FrameBgHovered] = ImVec4(0.14f, 0.11f, 0.28f, 1.0f);
+        colors[ImGuiCol_FrameBgActive] = ImVec4(0.20f, 0.15f, 0.38f, 1.0f);
+        colors[ImGuiCol_Button] = ImVec4(0.10f, 0.085f, 0.22f, 1.0f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.18f, 0.13f, 0.36f, 1.0f);
+        colors[ImGuiCol_ButtonActive] = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
+        colors[ImGuiCol_Header] = ImVec4(0.45f, 0.38f, 1.0f, 0.34f);
+        colors[ImGuiCol_HeaderHovered] = ImVec4(0.54f, 0.46f, 1.0f, 0.58f);
+        colors[ImGuiCol_HeaderActive] = ImVec4(0.54f, 0.46f, 1.0f, 1.0f);
+        colors[ImGuiCol_CheckMark] = ImVec4(0.54f, 0.46f, 1.0f, 1.0f);
+        colors[ImGuiCol_SliderGrab] = ImVec4(0.45f, 0.38f, 1.0f, 1.0f);
+        colors[ImGuiCol_SliderGrabActive] = ImVec4(0.54f, 0.46f, 1.0f, 1.0f);
+        colors[ImGuiCol_Border] = ImVec4(0.63f, 0.57f, 1.0f, 0.14f);
+        colors[ImGuiCol_Separator] = ImVec4(0.63f, 0.57f, 1.0f, 0.10f);
+        colors[ImGuiCol_Text] = ImVec4(0.94f, 0.94f, 1.0f, 1.0f);
+        colors[ImGuiCol_TextDisabled] = ImVec4(0.58f, 0.60f, 0.76f, 1.0f);
     }
 
     bool PointerOverPanel(Overlay::Impl* impl)
@@ -255,12 +278,59 @@ bool Overlay::Init(Contents contents)
         }];
         m_Impl->mouseMonitor = (__bridge_retained void*)monitor;
 
+        // Local key monitor: only events delivered to this app (the panel is
+        // key) reach it, so it needs no privacy grant. The app ignores it when
+        // the global tap is already delivering keys.
+        id keyMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+                                                             handler:^NSEvent* (NSEvent* event)
+        {
+            if (m_Impl != nullptr && m_Impl->keyHandler)
+                m_Impl->keyHandler(static_cast<int>(event.keyCode));
+            return event;
+        }];
+        m_Impl->keyMonitor = (__bridge_retained void*)keyMonitor;
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.FontGlobalScale = 1.0f;
+
+        /*
+            Crisp text: the same 16 px, 3x3-oversampled UI font the Windows
+            build rasterizes from Segoe UI. macOS has no Segoe, so the rounded
+            system faces are tried first - SF Pro Rounded gives the menu its
+            soft, cute look - then the plain system faces, with the built-in
+            font as the last resort.
+        */
+        ImFontConfig fontConfig;
+        fontConfig.OversampleH = 3;
+        fontConfig.OversampleV = 3;
+        fontConfig.PixelSnapH = true;
+        fontConfig.RasterizerMultiply = 1.05f;
+
+        const char* fontCandidates[] = {
+            "/System/Library/Fonts/SFNSRounded.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Rounded Bold.ttf",
+            "/System/Library/Fonts/SFNS.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/System/Library/Fonts/Supplemental/Arial.ttf"
+        };
+        bool fontLoaded = false;
+        for (const char* fontPath : fontCandidates)
+        {
+            if ([[NSFileManager defaultManager] fileExistsAtPath:@(fontPath)] == NO)
+                continue;
+            if (io.Fonts->AddFontFromFileTTF(fontPath, 16.0f, &fontConfig) != nullptr)
+            {
+                fontLoaded = true;
+                break;
+            }
+        }
+        if (!fontLoaded)
+            io.Fonts->AddFontDefault();
 
         ApplyPalette();
 
@@ -294,6 +364,12 @@ void Overlay::SetPassMouseThrough(bool pass)
         m_Impl->passMouse = pass;
 }
 
+void Overlay::SetKeyHandler(std::function<void(int)> handler)
+{
+    if (m_Impl != nullptr)
+        m_Impl->keyHandler = std::move(handler);
+}
+
 void Overlay::SetVisible(bool visible)
 {
     if (m_Impl == nullptr)
@@ -304,6 +380,24 @@ void Overlay::SetVisible(bool visible)
     DribtardPanel* window = (__bridge DribtardPanel*)m_Impl->window;
     if (window != nil && !visible)
         window.ignoresMouseEvents = YES;
+}
+
+void Overlay::BringToFront()
+{
+    if (m_Impl == nullptr)
+        return;
+
+    DribtardPanel* window = (__bridge DribtardPanel*)m_Impl->window;
+    if (window == nil)
+        return;
+
+    /*
+        orderFrontRegardless instead of makeKeyAndOrderFront: the panel must
+        come back without activating the app, so whatever the user was doing in
+        the game keeps keyboard focus, exactly like the first launch.
+    */
+    m_Impl->visible = true;
+    [window orderFrontRegardless];
 }
 
 void Overlay::Shutdown()
@@ -322,6 +416,13 @@ void Overlay::Shutdown()
             [NSEvent removeMonitor:(__bridge id)m_Impl->mouseMonitor];
             CFRelease(m_Impl->mouseMonitor);
             m_Impl->mouseMonitor = nullptr;
+        }
+
+        if (m_Impl->keyMonitor != nullptr)
+        {
+            [NSEvent removeMonitor:(__bridge id)m_Impl->keyMonitor];
+            CFRelease(m_Impl->keyMonitor);
+            m_Impl->keyMonitor = nullptr;
         }
 
         if (m_Impl->view != nullptr)

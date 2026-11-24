@@ -9,15 +9,12 @@
 #include <thread>
 
 /*
-    Blade Ball: the parry (block) is F, the ability is Q. The shield a parry
-    raises stays up for 500 ms and a parry that deflects nothing starts a 2 s
-    cooldown. A curve shot sweeps the camera and parries at the end of it.
+    Blade Ball: the parry (block) is F, the ability is Q. A curve shot sweeps
+    the camera and parries at the end of it.
 */
 
-inline constexpr int kParryShieldMs = 500;
-inline constexpr int kParryWhiffCooldownMs = 2000;
-// The 500 ms shield starts at the press, so the hold only has to be long
-// enough for the game to register a block.
+// The parry key is held this long: just long enough for the game to register
+// a block.
 inline constexpr double kParryHoldSeconds = 0.020;
 
 struct ParryCurvePreset

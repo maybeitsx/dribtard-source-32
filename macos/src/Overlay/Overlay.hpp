@@ -28,9 +28,20 @@ public:
     void SetPanelRect(float x, float y, float width, float height);
     void SetVisible(bool visible);
 
+    // Puts the panel window back in front of the game. A hidden panel keeps its
+    // window - the frame just draws nothing - so this is enough to show it again.
+    void BringToFront();
+
     // While the clicker is posting mouse buttons, the panel must not receive
     // them. Otherwise every injected click lands on the menu.
     void SetPassMouseThrough(bool pass);
+
+    /*
+        Fallback for keys typed while the panel itself has focus. The global
+        tap is the primary path; this keeps the menu key working when Input
+        Monitoring is missing and the tap could not be created.
+    */
+    void SetKeyHandler(std::function<void(int)> handler);
 
 private:
     Impl* m_Impl = nullptr;

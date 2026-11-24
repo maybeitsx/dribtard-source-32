@@ -38,22 +38,36 @@ browser, Mail or AirDrop is quarantined and macOS refuses the first launch with
 
 1. Drag `dribtard-mac.app` into `/Applications`.
 2. Double-click **Fix and open.command**. Terminal opens, clears the quarantine
-   flag, signs the app on that Mac and launches it.
+   flag, restores the app's execute permission, signs the app on that Mac and
+   launches it.
 
-From then on the app opens with a plain double-click. The helper is the same
-three commands Apple's own "Open Anyway" performs:
+From then on the app opens with a plain double-click. The helper performs the
+same repairs as Apple's own "Open Anyway", plus the permission fix:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/dribtard-mac.app
+xattr -cr /Applications/dribtard-mac.app
+chmod -R u+rwX,go+rX /Applications/dribtard-mac.app
+chmod +x /Applications/dribtard-mac.app/Contents/MacOS/dribtard-mac
 codesign --force --deep --sign - /Applications/dribtard-mac.app
 open /Applications/dribtard-mac.app
 ```
+
+The `chmod` step matters for a bundle that lost its execute bit: macOS then
+reports "cannot be opened" or "is damaged and can't be opened" before the app
+even starts. A zip created on Windows (including archives repacked there) does
+not store Unix permissions, so those copies always need it.
 
 Or paste this single line into Terminal, which finds the app in `~/Downloads` or
 `/Applications` on its own:
 
 ```sh
-APP=$(ls -d ~/Downloads/dribtard-mac.app /Applications/dribtard-mac.app 2>/dev/null | head -1); xattr -dr com.apple.quarantine "$APP"; codesign --force --deep --sign - "$APP"; open "$APP"
+APP=$(ls -d ~/Downloads/dribtard-mac.app /Applications/dribtard-mac.app 2>/dev/null | head -1); if [ -z "$APP" ]; then echo "Move dribtard-mac.app into /Applications first"; else xattr -cr "$APP"; chmod -R u+rwX,go+rX "$APP"; chmod +x "$APP/Contents/MacOS/dribtard-mac"; codesign --force --deep --sign - "$APP"; open "$APP"; fi
+```
+
+If double-clicking the helper does nothing, run it through `sh`:
+
+```sh
+sh "/Applications/Fix and open.command"
 ```
 
 Without Terminal at all: right-click the app → **Open**, or System Settings →
@@ -70,12 +84,18 @@ above cannot do it. The workflow already packages the helper into the artifact.
 
 1. Launch `dribtard-mac.app`. It is an accessory app: no Dock icon, just the
    floating panel.
-2. macOS asks for **Accessibility** permission, or you grant it in
-   System Settings → Privacy & Security → Accessibility. Without it the app
-   cannot post keys to Roblox and the global hotkeys do not fire; if they stay
-   dead after that, also enable **Input Monitoring**. The app retries its key
-   tap every two seconds, so granting the permission starts the menu key and
-   key capturing straight away — no relaunch needed.
+2. macOS asks for **Accessibility** and **Input Monitoring**. Grant both in
+   System Settings → Privacy & Security: Accessibility lets the app post keys
+   to Roblox, and Input Monitoring lets its listen-only tap see the menu key
+   and every other hotkey. Without Input Monitoring the tap cannot be created
+   at all, so the menu key cannot hide the panel: hiding is only allowed while
+   the tap can bring it back, and a press shows "Allow Input Monitoring to hide
+   the panel" instead. The panel's status line then reads "Hotkeys off: allow
+   Input Monitoring". The app retries its key tap every two seconds, so
+   granting the permission starts the menu key straight away — no relaunch
+   needed. If the panel is ever hidden, opening the app again shows it, because
+   macOS routes a second launch to the running copy instead of starting a new
+   one.
 3. Click the Roblox window once so it is frontmost. The panel is click-through
    everywhere except its own card, so clicking the game normally still works.
 
@@ -98,7 +118,23 @@ above cannot do it. The workflow already packages the helper into the artifact.
   Left -70/18) apply only while armed. Custom angle keeps your own degrees.
   Its Roblox slider and box value are separate from the General page. Optional
   ability follow-up and camera return. There is no timing jitter.
-- **Settings** – menu key (`\`), accent colour, panel opacity, quit.
+- **Config** – named profiles: save the whole setup, load it back, delete it.
+  The last-used settings still autosave, exactly like Windows.
+- **Settings** – the Windows two-column layout: Client (accent, notifications,
+  card and panel colours), Keybinds (menu, trigger, ability), Appearance (icon
+  glow, window halo, menu opacity, tab fade), Menu mode (Portable/Classic) and
+  Miscellaneous (chat detection, darken background, panic key, restore
+  defaults, unload).
+- **Chat detection** (Settings → Miscellaneous) pauses every macro keybind while
+  the in-game chat is open: `/` opens it, Enter sends the message and brings the
+  keybinds back, and Escape closes the chat and brings them back too. `F12` and
+  the menu key stay live. Detection only listens in the Roblox window and clears
+  itself if the game loses focus.
+- **UI parity** – the same 900x580 glass panel, icon rail, five tabs, card
+  headers, animated switches, trajectory preview, accent-coloured controls and
+  top-right notices as the Windows build. Sliders, keys and pages use the same
+  measurements and palette, with a rounded 16 px UI font: SF Pro Rounded when
+  the system provides it, Arial Rounded as the fallback.
 - **F12** is the emergency stop in every mode and cannot be rebound.
 - Settings persist to `~/Library/Application Support/dribtard/last.json`,
   debounced and saved on exit.
@@ -107,7 +143,14 @@ above cannot do it. The workflow already packages the helper into the artifact.
 
 - **No licence validation yet.** `AppCore::Licensed()` is the single hook every
   start path already calls; wire the licence server check there before shipping.
-- **No auto-updater and no Spotify widget.**
+  The Windows licence client is WinHTTP + DPAPI, so it is a separate piece of
+  work on macOS (URLSession + Keychain).
+- **No auto-updater and no Spotify widget.** The Windows updater replaces a
+  signed `.exe`; the macOS build ships as a zipped, ad-hoc signed `.app` from
+  the GitHub Actions workflow, so it needs its own feed and swap logic.
+- **Stream proof, memory watch, debug tools and Roblox rejoin are Windows-only.**
+  They use Windows capture APIs, process memory access or the Windows Roblox
+  client; none of them has a working macOS counterpart here.
 - **One screen.** The overlay covers the main display; multi-display setups and
   Spaces switching during a macro are not handled yet.
 - **Focus.** The menu sitting in front still counts as the game being focused
@@ -137,8 +180,12 @@ macos/
 
 ## Verification status
 
-This port tracks the Windows 1.1.13 feature set (clicker, camera scale, Blade Ball
-presets). It was written on a Windows machine that has no macOS toolchain, so the
-Xcode/CMake build has **not** been compiled or run here. GitHub Actions builds
-`macos/` on a Mac runner when that tree is pushed. Expect to test the permission
-flow and a real game session before shipping it.
+This port now tracks the Windows 1.1.35 menu feature set (five tabs, configs,
+appearance, chat detection, clicker output key). It is written on a Windows
+machine that has no macOS toolchain, so the Xcode/CMake build has **not** been
+compiled or run here. What was checked locally is the portable C++ layer
+(`Menu.cpp`, `Settings.cpp` and the three engines), which passes an MSVC
+syntax-only compile; the Objective-C++ files (`App.mm`, `Overlay.mm`) and the
+Metal/AppKit runtime are unverified. GitHub Actions builds `macos/` on a Mac
+runner when that tree is pushed. Expect to test the permission flow and a real
+game session before shipping it.

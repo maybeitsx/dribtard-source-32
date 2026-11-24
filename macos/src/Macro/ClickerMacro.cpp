@@ -23,8 +23,17 @@ void ClickerEngine::SetSettings(const ClickerSettings& settings)
     clamped.cps = ClampClickerCps(settings.cps);
     if (clamped.mode != ClickerMode::Hold && clamped.mode != ClickerMode::Toggle)
         clamped.mode = ClickerMode::Hold;
-    if (clamped.button != ClickerButton::Left && clamped.button != ClickerButton::Right)
-        clamped.button = ClickerButton::Left;
+
+    /*
+        The output can never be the activation key (the injected presses would
+        look like the user holding it) and never the emergency stop. Both fall
+        back to a left click, exactly like the Windows build.
+    */
+    if (clamped.outputKey == clamped.key || clamped.outputKey == Keys::F12 ||
+        clamped.outputKey == 0 || clamped.outputKey < ClickerMouseRight)
+    {
+        clamped.outputKey = ClickerMouseLeft;
+    }
 
     {
         std::lock_guard<std::mutex> lock(m_SettingsMutex);
@@ -32,7 +41,7 @@ void ClickerEngine::SetSettings(const ClickerSettings& settings)
     }
 
     m_Cps.store(clamped.cps, std::memory_order_relaxed);
-    m_Button.store(clamped.button == ClickerButton::Right ? 1 : 0, std::memory_order_relaxed);
+    m_OutputKey.store(clamped.outputKey, std::memory_order_relaxed);
 }
 
 ClickerSettings ClickerEngine::GetSettings() const
@@ -58,9 +67,7 @@ bool ClickerEngine::Start()
             return false;
 
         m_Cps.store(ClampClickerCps(m_Settings.cps), std::memory_order_relaxed);
-        m_Button.store(
-            m_Settings.button == ClickerButton::Right ? 1 : 0,
-            std::memory_order_relaxed);
+        m_OutputKey.store(m_Settings.outputKey, std::memory_order_relaxed);
     }
 
     if (m_Worker.joinable())
@@ -137,22 +144,41 @@ void ClickerEngine::Run()
         while (!ShouldStop())
         {
             const int cps = ClampClickerCps(m_Cps.load(std::memory_order_relaxed));
-            const bool right = m_Button.load(std::memory_order_relaxed) != 0;
+            const int outputKey = m_OutputKey.load(std::memory_order_relaxed);
             const double interval = 1.0 / static_cast<double>(cps);
 
             const auto began = std::chrono::steady_clock::now();
 
             if (m_Click)
             {
-                m_Click(right);
+                m_Click(outputKey);
             }
-            else
+            else if (ClickerOutputIsMouse(outputKey))
             {
+                const bool right = ClickerOutputIsRight(outputKey);
                 auto sendEdge = [&](bool up)
                 {
                     for (int attempt = 0; attempt < 4 && !ShouldStop(); ++attempt)
                     {
                         if (MacInput::PostMouseButton(right, up))
+                            return;
+                        SpinFor(0.0001);
+                    }
+                };
+
+                sendEdge(false);
+                SpinFor(interval / 3.0);
+                sendEdge(true);
+            }
+            else
+            {
+                // A keyboard output is held for part of the gap and released
+                // for the rest, the same way the mouse path runs.
+                auto sendEdge = [&](bool up)
+                {
+                    for (int attempt = 0; attempt < 4 && !ShouldStop(); ++attempt)
+                    {
+                        if (MacInput::PostKey(outputKey, up))
                             return;
                         SpinFor(0.0001);
                     }

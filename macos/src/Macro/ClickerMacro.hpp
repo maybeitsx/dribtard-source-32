@@ -15,11 +15,26 @@ enum class ClickerMode
     Toggle
 };
 
-enum class ClickerButton
+/*
+    Mouse outputs use negative values so a real macOS key code (0-255) can be
+    stored in the same setting, exactly like the Windows build where a virtual
+    key and a mouse button share one field.
+*/
+enum ClickerMouseOutput : int
 {
-    Left,
-    Right
+    ClickerMouseLeft = -1,
+    ClickerMouseRight = -2
 };
+
+inline bool ClickerOutputIsMouse(int outputKey)
+{
+    return outputKey < 0;
+}
+
+inline bool ClickerOutputIsRight(int outputKey)
+{
+    return outputKey == ClickerMouseRight;
+}
 
 inline constexpr int kClickerMinCps = 1;
 inline constexpr int kClickerMaxCps = 1500;
@@ -37,12 +52,14 @@ struct ClickerSettings
 {
     int key = Keys::X;
     ClickerMode mode = ClickerMode::Hold;
-    ClickerButton button = ClickerButton::Left;
+    // What the clicker presses: a mouse button (negative) or any key.
+    int outputKey = ClickerMouseLeft;
     int cps = 16;
 };
 
-// true = right button. A false return does not stop the loop.
-using ClickerClickFn = std::function<bool(bool rightButton)>;
+// Receives the output key that should be pressed once. A false return does not
+// stop the loop: one rejected click must not kill the stream.
+using ClickerClickFn = std::function<bool(int outputKey)>;
 
 class ClickerEngine
 {
@@ -76,7 +93,7 @@ private:
     std::atomic<bool> m_Running{ false };
     std::atomic<bool> m_StopRequested{ false };
     std::atomic<int> m_Cps{ 16 };
-    std::atomic<int> m_Button{ 0 };
+    std::atomic<int> m_OutputKey{ ClickerMouseLeft };
     std::atomic<int> m_Clicks{ 0 };
 
     mutable std::mutex m_SettingsMutex;

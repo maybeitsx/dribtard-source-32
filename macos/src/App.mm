@@ -43,6 +43,9 @@ namespace
         bool clickerBlockedUntilRelease = false;
         bool clickerLatched = false;
         bool clickerKeyWasDown = false;
+        // Chat detection: true while the in-game chat is open ("/" until
+        // Enter). Every macro keybind is suspended while it is set.
+        bool chatActive = false;
         int clickerSampleClicks = 0;
         float clickerMeasuredCps = -1.0f;
         std::chrono::steady_clock::time_point clickerSampleAt{};
@@ -63,11 +66,29 @@ namespace
             if (!MacInput::IsTrusted())
                 MacInput::RequestTrust();
 
+            // A listen-only key tap is covered by Input Monitoring, a separate
+            // grant from Accessibility. AppKit never prompts for it, so ask
+            // here: without it every hotkey, including the menu key, is dead.
+            if (!MacInput::HasListenAccess())
+                MacInput::RequestListenAccess();
+
             if (!overlay.Init([this]() { Frame(); }))
                 return false;
 
-            // Global hotkeys are optional: without Accessibility permission
-            // the tap cannot be created, and the menu still works.
+            overlay.SetKeyHandler([this](int keyCode)
+            {
+                // The global tap is the primary path. This fallback only runs
+                // while it is unavailable, so a press is never handled twice,
+                // and it keeps the menu key working when the panel itself has
+                // focus but Input Monitoring has not been granted.
+                if (hotkeys.Running())
+                    return;
+                if (keyCode == config.ui.menuKey)
+                    ToggleMenu();
+            });
+
+            // Global hotkeys are optional: without the permissions the tap
+            // cannot be created, and the menu still works.
             hotkeys.Start();
 
             started = true;
@@ -91,6 +112,47 @@ namespace
             overlay.Shutdown();
         }
 
+        /*
+            The menu key, from the global tap and from the panel's own key
+            monitor.
+
+            The panel is the app's only window and the app has no Dock icon, so
+            hiding it is only safe while the global tap can bring it back. The
+            fallback monitor needs the panel to be key, which a hidden panel
+            cannot be until it is visible and clicked again, and macOS sends no
+            key to an app that is not frontmost. Without the tap a hide would
+            therefore look exactly like the app having quit, and the process
+            would stay alive with nothing on screen. Refuse the hide and say
+            why instead of losing the window.
+        */
+        void ToggleMenu()
+        {
+            if (!menu.Visible())
+            {
+                ShowMenu();
+                return;
+            }
+
+            if (!hotkeys.Running())
+            {
+                menu.ShowNotice("Allow Input Monitoring to hide the panel");
+                return;
+            }
+
+            menu.SetVisible(false);
+        }
+
+        // Puts the panel back on screen. Used by the menu key and by a second
+        // launch, which macOS routes here instead of starting another copy.
+        void ShowMenu()
+        {
+            if (!started)
+                return;
+
+            menu.SetVisible(true);
+            overlay.BringToFront();
+        }
+
         void HandleKey(int keyCode)
         {
             // Emergency stop works even while a key is being rebound.
@@ -111,13 +173,49 @@ namespace
                 return;
             }
 
+            /*
+                Chat detection. "/" opens the in-game chat, so every macro
+                keybind is suspended until Enter sends the message or Escape
+                closes it. Only the game window counts, so typing "/" or Enter
+                in another app never pauses the macro.
+            */
+            if (config.ui.chatDetection && MacInput::GameFocused())
+            {
+                if (keyCode == Keys::Slash)
+                {
+                    chatActive = true;
+                    return;
+                }
+                if (keyCode == Keys::Return)
+                {
+                    chatActive = false;
+                    return;
+                }
+                /*
+                    Escape closes the chat without sending, so it must hand
+                    the keybinds back too. The check only runs while the chat
+                    is open, so a macro key bound to Escape still works the
+                    rest of the time.
+                */
+                if (chatActive && keyCode == Keys::Escape)
+                {
+                    chatActive = false;
+                    return;
+                }
+            }
+
             // The menu key is checked before every other shortcut, so a key
             // bound to it always toggles the panel.
             if (keyCode == config.ui.menuKey)
             {
-                menu.SetVisible(!menu.Visible());
+                ToggleMenu();
                 return;
             }
+
+            // The in-game chat owns the keyboard until Enter or Escape: no
+            // macro keybind may fire while the user is typing a message.
+            if (chatActive)
+                return;
 
             if (config.bladeBall.armed && keyCode == config.bladeBall.triggerKey)
             {
@@ -133,6 +231,7 @@ namespace
                 {
                     config.bladeBall.curveType = curve;
                     config.bladeBall.customCurveAngle = false;
+                    menu.ShowNotice(std::string(ParryCurvePresetFor(curve).name) + " parry");
                     return;
                 }
             }
@@ -153,6 +252,7 @@ namespace
                 {
                     config.macro.curveType = curve;
                     config.macro.customCurveAngle = false;
+                    menu.ShowNotice(CurvePresetFor(curve).name);
                 }
             }
         }
@@ -211,6 +311,13 @@ namespace
                 HandleKey(key);
 
             const bool focused = MacInput::GameFocused();
+
+            // The chat lives in the game window. Losing focus means it is gone,
+            // so the suspension is cleared with it instead of leaving the
+            // keybinds dead.
+            if (!config.ui.chatDetection || !focused)
+                chatActive = false;
+
             const bool structureRunning = structure.IsRunning();
 
             const bool capturing = menu.IsCapturingKey();
@@ -226,7 +333,7 @@ namespace
             }
             else
             {
-                const bool pressed = keyDown && !clickerKeyWasDown;
+                const bool pressed = keyDown && !clickerKeyWasDown && !chatActive;
                 if (pressed &&
                     !clickerBlockedUntilRelease &&
                     config.clicker.mode == ClickerMode::Toggle)
@@ -236,7 +343,8 @@ namespace
                 clickerKeyWasDown = keyDown;
             }
 
-            const bool heldNow = keyDown && !capturing && !clickerBlockedUntilRelease;
+            const bool heldNow = keyDown && !capturing && !clickerBlockedUntilRelease &&
+                !chatActive;
             bool engaged = false;
             if (config.clicker.mode == ClickerMode::Toggle)
             {
@@ -270,6 +378,7 @@ namespace
             const bool clickerAllowed =
                 Licensed() &&
                 engaged &&
+                !chatActive &&
                 gameFocused &&
                 !structureRunning;
 
@@ -327,6 +436,8 @@ namespace
             status.clickerPause = clickerPause;
             status.bladeBallRunning = bladeBall.IsRunning();
             status.parries = bladeBall.ParryCount();
+            status.chatActive = chatActive;
+            status.hotkeysActive = hotkeys.Running();
             menu.SetStatus(status);
 
             MenuActions actions;
@@ -408,6 +519,23 @@ namespace
         delete g_Core;
         g_Core = nullptr;
     }
+}
+
+/*
+    A second launch - a double-click in Finder, `open`, or any other request to
+    open the bundle - is delivered to the running process instead of starting a
+    new one. When the panel was hidden with the menu key the app looks closed,
+    so this is the path that makes opening it again actually show the panel.
+*/
+- (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)hasVisibleWindows
+{
+    (void)sender;
+    (void)hasVisibleWindows;
+
+    if (g_Core != nullptr)
+        g_Core->ShowMenu();
+
+    return YES;
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender
