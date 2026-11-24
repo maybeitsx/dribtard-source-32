@@ -1,5 +1,6 @@
 #!/bin/sh
-# dribtard: clears Gatekeeper's quarantine, signs the app locally, then opens it.
+# dribtard: clears Gatekeeper's quarantine, repairs permissions, signs the app
+# locally, then opens it.
 #
 # Double-click this file. It runs in Terminal, prints what it is doing and
 # launches dribtard. Nothing is installed and nothing else is needed.
@@ -22,13 +23,38 @@ if [ ! -d "$APP" ]; then
 fi
 
 echo "Fixing $APP"
-xattr -dr com.apple.quarantine "$APP" 2>/dev/null
+
+# 1. Quarantine. macOS sets this on anything that arrived through a browser,
+#    Mail or AirDrop, and Gatekeeper refuses the first launch of an app that
+#    is not notarised by Apple.
+xattr -cr "$APP" 2>/dev/null
+
+# 2. Execute permission. A zip made on Windows, or a copy moved with some
+#    tools, drops the executable bit. macOS then reports the app "cannot be
+#    opened" or "is damaged" before a single line of it runs.
+chmod -R u+rwX,go+rX "$APP" 2>/dev/null
 chmod +x "$APP/Contents/MacOS/dribtard-mac" 2>/dev/null
+
+# 3. Signature. The shipped bundle is ad-hoc signed, and the signature can be
+#    stale after a copy or a quarantine strip, so sign it again on this Mac.
 codesign --force --deep --sign - "$APP" 2>/dev/null ||
     echo "note: re-signing reported an error, which is usually harmless here"
 
+if ! codesign --verify --deep "$APP" 2>/dev/null; then
+    echo "warning: the signature still does not verify. If the app will not"
+    echo "open, move it into /Applications and run this helper again."
+fi
+
 echo "Opening dribtard..."
-open "$APP"
+if ! open "$APP"; then
+    echo
+    echo "macOS still refused to launch it. Open System Settings -> Privacy &"
+    echo "Security, scroll to Security, click \"Open Anyway\" next to the"
+    echo "message about dribtard-mac, then run this helper once more."
+    echo "Press Return to close."
+    read -r _
+    exit 1
+fi
 
 echo
 echo "Done. dribtard has no Dock icon: its panel floats over Roblox."

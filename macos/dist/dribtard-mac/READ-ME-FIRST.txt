@@ -11,8 +11,20 @@ The short version
 
 macOS refuses apps that were downloaded and are not notarised by Apple. The
 helper does exactly what Apple's own "Open Anyway" does, in one step: it removes
-the quarantine flag, signs the app on your Mac, and opens it. It is safe to run
-again at any time.
+the quarantine flag, restores the app's execute permission, signs the app on
+your Mac, and opens it. It is safe to run again at any time.
+
+It also fixes the "dribtard-mac.app is damaged and can't be opened" and
+"cannot be opened" messages, which appear when a copy lost its execute
+permission (for example, a zip made on Windows) or its signature no longer
+matches the files.
+
+If double-clicking the helper only shows "permission denied" or does nothing,
+open Terminal and run this instead:
+
+  sh "/Applications/Fix and open.command"
+
+(Use the path where you put the helper if it is not in Applications.)
 
 
 If you prefer to paste a command
@@ -21,7 +33,7 @@ If you prefer to paste a command
 Open Terminal (Applications -> Utilities -> Terminal) and paste this one line,
 then press Return:
 
-  APP=$(ls -d ~/Downloads/dribtard-mac.app /Applications/dribtard-mac.app 2>/dev/null | head -1); xattr -dr com.apple.quarantine "$APP"; codesign --force --deep --sign - "$APP"; open "$APP"
+  APP=$(ls -d ~/Downloads/dribtard-mac.app /Applications/dribtard-mac.app 2>/dev/null | head -1); if [ -z "$APP" ]; then echo "Move dribtard-mac.app into /Applications first"; else xattr -cr "$APP"; chmod -R u+rwX,go+rX "$APP"; chmod +x "$APP/Contents/MacOS/dribtard-mac"; codesign --force --deep --sign - "$APP"; open "$APP"; fi
 
 
 Doing it without Terminal at all
