@@ -179,6 +179,16 @@ void Menu::BeginCard(const char* id, float width, float height)
 
 void Menu::EndCard()
 {
+    /*
+        Several cards end by moving the cursor below their last row to leave
+        breathing room. ImGui reads a moved cursor with no item after it as an
+        attempt to grow the child past its content and raises "Code uses
+        SetCursorPos()/SetCursorScreenPos() to extend window/parent boundaries"
+        (the Calibration card did exactly this). A zero-height Dummy records
+        that space properly, so every card closes cleanly.
+    */
+    ImGui::Dummy(ImVec2(0.0f, 0.0f));
+
     ImGui::EndChild();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor(2);
